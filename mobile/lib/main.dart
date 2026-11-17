@@ -417,7 +417,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   final _sku = TextEditingController();
   final _name = TextEditingController();
   final _brand = TextEditingController();
-  final _currency = TextEditingController(text: 'DJF');
+  final _currency = TextEditingController();
   final _units = <_UnitFields>[_UnitFields(isBase: true)];
   bool _saving = false;
 
@@ -784,7 +784,7 @@ class _NewReceiptDialogState extends State<NewReceiptDialog> {
   final _number = TextEditingController();
   final _quantity = TextEditingController(text: '1');
   final _cost = TextEditingController(text: '0');
-  final _currency = TextEditingController(text: 'DJF');
+  final _currency = TextEditingController();
   bool _saving = false;
 
   @override
