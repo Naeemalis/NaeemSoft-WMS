@@ -157,7 +157,7 @@ def list_products():
         rows = conn.execute(
             """
             SELECT p.id, p.sku, p.name, p.brand, p.description,
-                   bu.name AS base_unit_name,
+                   buu.name AS base_unit_name,
                    COALESCE(ih.quantity_on_hand_base, 0) AS quantity_on_hand_base,
                    COALESCE(
                      jsonb_agg(
@@ -176,9 +176,6 @@ def list_products():
             JOIN naeemsoft_wms.product_units bu
               ON bu.product_id = p.id AND bu.is_base = true
             JOIN naeemsoft_wms.units buu ON buu.id = bu.unit_id
-            JOIN LATERAL (
-                SELECT buu.name
-            ) base_unit ON true
             LEFT JOIN naeemsoft_wms.product_units pu ON pu.product_id = p.id AND pu.is_active = true
             LEFT JOIN naeemsoft_wms.units u ON u.id = pu.unit_id
             LEFT JOIN naeemsoft_wms.product_unit_prices pup ON pup.product_unit_id = pu.id
