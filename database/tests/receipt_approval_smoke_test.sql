@@ -52,6 +52,17 @@ BEGIN
         (v_product_id, v_pack_unit_id, 10, false),
         (v_product_id, v_carton_unit_id, 240, false);
 
+    -- Receipt lines reference product_units.id, not the global units.id.
+    SELECT pu.id INTO v_piece_unit_id
+      FROM product_units pu JOIN units u ON u.id = pu.unit_id
+     WHERE pu.product_id = v_product_id AND u.code = 'piece';
+    SELECT pu.id INTO v_pack_unit_id
+      FROM product_units pu JOIN units u ON u.id = pu.unit_id
+     WHERE pu.product_id = v_product_id AND u.code = 'pack';
+    SELECT pu.id INTO v_carton_unit_id
+      FROM product_units pu JOIN units u ON u.id = pu.unit_id
+     WHERE pu.product_id = v_product_id AND u.code = 'carton';
+
     INSERT INTO product_unit_prices(product_unit_id, sale_price, currency_code, updated_by)
     SELECT pu.id,
            CASE u.code WHEN 'piece' THEN 10 WHEN 'pack' THEN 80 ELSE 1500 END,
