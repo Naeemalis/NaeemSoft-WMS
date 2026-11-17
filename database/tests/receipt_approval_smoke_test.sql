@@ -53,7 +53,7 @@ BEGIN
         (v_product_id, v_carton_unit_id, 240, false);
 
     INSERT INTO product_unit_prices(product_unit_id, sale_price, currency_code, updated_by)
-    SELECT id,
+    SELECT pu.id,
            CASE u.code WHEN 'piece' THEN 10 WHEN 'pack' THEN 80 ELSE 1500 END,
            'TST',
            v_user_id
