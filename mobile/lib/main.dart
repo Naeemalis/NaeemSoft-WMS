@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -506,7 +506,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                           children: [
                             Align(
                               alignment: Alignment.centerRight,
-                              child: Text(unit.isBase ? 'الوحدة الأساسية' : 'وحدة إضافية ${index}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              child: Text(unit.isBase ? 'الوحدة الأساسية' : 'وحدة إضافية $index', style: const TextStyle(fontWeight: FontWeight.bold)),
                             ),
                             const SizedBox(height: 8),
                             _field(unit.code, 'رمز الوحدة', validator: _required),
@@ -859,14 +859,14 @@ class _NewReceiptDialogState extends State<NewReceiptDialog> {
                     TextField(controller: _number, decoration: const InputDecoration(labelText: 'رقم فاتورة التوريد')),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
-                      value: _supplierId,
+                      initialValue: _supplierId,
                       decoration: const InputDecoration(labelText: 'المورد'),
                       items: suppliers.map((s) => DropdownMenuItem<String>(value: s['id'].toString(), child: Text(s['name'].toString()))).toList(),
                       onChanged: (v) => setState(() => _supplierId = v),
                     ),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
-                      value: _productUnitId,
+                      initialValue: _productUnitId,
                       decoration: const InputDecoration(labelText: 'الصنف ووحدة الشراء'),
                       items: unitOptions.map((u) => DropdownMenuItem<String>(value: u['id'].toString(), child: Text(u['label'].toString(), overflow: TextOverflow.ellipsis))).toList(),
                       onChanged: (v) => setState(() => _productUnitId = v),
