@@ -183,7 +183,7 @@ def list_products():
               ON ih.product_id = p.id AND ih.warehouse_id = %s
             WHERE p.is_active = true
             GROUP BY p.id, p.sku, p.name, p.brand, p.description,
-                     bu.name, ih.quantity_on_hand_base
+                     buu.name, ih.quantity_on_hand_base
             ORDER BY p.name
             """,
             (warehouse_id,),
