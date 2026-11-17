@@ -30,6 +30,7 @@ jobs:
           cp -R mobile/lib /tmp/naeemsoft_wms/
           cp mobile/pubspec.yaml /tmp/naeemsoft_wms/pubspec.yaml
           cp mobile/AndroidManifest.xml /tmp/naeemsoft_wms/android/app/src/main/AndroidManifest.xml
+          rm -rf /tmp/naeemsoft_wms/test
 
       - name: Resolve dependencies
         working-directory: /tmp/naeemsoft_wms
