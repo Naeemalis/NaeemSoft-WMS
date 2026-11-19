@@ -453,7 +453,7 @@ def list_available_stock():
         _, warehouse_id = default_location(conn)
         rows = conn.execute(
             """SELECT product_id, sku, product_name, product_unit_id, unit_code,
-                      unit_name, factor_to_base, sale_price, currency_code,
+                      unit_name, base_unit_name, factor_to_base, sale_price, currency_code,
                       quantity_on_hand_base
                FROM naeemsoft_wms.v_products_available_for_issue
                WHERE warehouse_id=%s ORDER BY product_name, factor_to_base DESC""",
