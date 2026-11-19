@@ -1,6 +1,6 @@
 # NaeemSoft-WMS
 
-Warehouse and inventory management system. The project is being implemented in stages, with PostgreSQL as the primary database and Flutter for Android.
+Warehouse and inventory management system. PostgreSQL is the primary database and Flutter is the Android client.
 
 ## Repository layout
 
@@ -14,31 +14,30 @@ Warehouse and inventory management system. The project is being implemented in s
 
 1. Copy `.env.example` to `.env`.
 2. Set a strong `POSTGRES_PASSWORD` and `WMS_API_KEY`.
-3. Confirm `WMS_BASE_CURRENCY` is the currency you intend to use. The example value is DJF; change it if needed.
-4. Start the stack with Docker Compose:
+3. Confirm `WMS_BASE_CURRENCY` is the currency you intend to use. The example value is DJF.
+4. Start with `docker compose up --build -d`.
+5. Check `http://localhost:8000/health` and API docs at `http://localhost:8000/docs`.
 
-   ```bash
-   docker compose up --build -d
-   ```
+For an existing database volume, apply new migrations deliberately. Do not delete a production volume to force initialization.
 
-5. Check `http://localhost:8000/health` and API documentation at `http://localhost:8000/docs`.
+## Android APK
 
-The database migrations are mounted into PostgreSQL's initialization directory and run when the database volume is first created. If you change the initial migration set after the volume already exists, apply the new migration deliberately; do not delete a production database volume to force initialization.
+A push changing `mobile/**` starts the **Build NaeemSoft-WMS Android APK** workflow. Download the `NaeemSoft-WMS-Android-APK` artifact from the successful Actions run.
 
-## Build the Android APK
+## Implemented milestone 0.2
 
-Every push that changes `mobile/**` or the Android build workflow starts the **Build NaeemSoft-WMS Android APK** workflow. Open the repository's Actions tab, select the successful run, and download the `NaeemSoft-WMS-Android-APK` artifact.
+- Arabic right-to-left Android shell, dashboard, product catalogue and stock display.
+- Separate multi-line receiving cashier with product grid; receipt drafts are submitted for approval and only approved receipts increase stock.
+- Separate wholesale issue cashier with an available-stock product grid; zero-stock items are excluded from the issue catalogue.
+- Issue drafts require submission and approval; approval allocates stock from batches using earliest expiry first and blocks insufficient stock.
+- Product-specific unit conversions and manually entered prices per sale unit.
+- Supplier and recipient account statement APIs and screens.
+- Supplier settlement and recipient collection entries.
+- Stock monitoring for zero balances and expiry within 30 days (highlighted green).
+- API URL and API-key configuration.
 
-## Current Android milestone (0.1)
+## Important limitations
 
-- Arabic right-to-left application shell.
-- Dashboard indicators.
-- Product master with product-specific units and independently entered prices.
-- Stock display in the smallest/base unit only.
-- Supplier registration.
-- Receipt creation as draft, submission for approval and approval.
-- API URL and API-key configuration from the app.
+The first integration milestone still uses a shared private service API key and a system actor. It is for a trusted development/private network only. Before public or production exposure, implement per-user authentication, branch-scoped authorization, TLS and permission checks for approval and payment actions.
 
-The current API uses a private service API key and a service actor for the first integration milestone. It is intended for a trusted development/private network only. Before public or production exposure, implement per-user login, branch-scoped permissions, TLS, and authorization checks for approval actions.
-
-Sales invoices, quotations, customer and supplier statements, returns, stock counts, transfers, exchange-rate management, competitor intelligence and the full role/permission UI remain planned milestones. The valuation method (FIFO or weighted average) remains intentionally undecided.
+The current statement model records supplier receipts/payments and approved recipient issues/collections. Supplier and recipient return workflows, minimum-stock thresholds, stock counts, transfers, full role/permission UI and valuation (FIFO vs weighted average) still require subsequent implementation. The valuation method has not been selected.
