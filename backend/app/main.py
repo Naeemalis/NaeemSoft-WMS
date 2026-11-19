@@ -687,3 +687,79 @@ def update_product_reorder_level(product_id: UUID, payload: ReorderLevelUpdate):
         if not row:
             raise HTTPException(404,"الصنف غير موجود أو غير نشط")
         return {**dict(row),"reorder_level_base":float(row["reorder_level_base"])}
+
+
+@app.get("/api/receipts/{receipt_id}", dependencies=[Depends(require_api_key)])
+def get_receipt(receipt_id: UUID):
+    with db() as conn:
+        header = conn.execute(
+            """SELECT r.id,r.receipt_number,r.status,r.receipt_date,r.currency_code,
+                      r.supplier_invoice_number,r.notes,s.name AS party_name,s.phone AS party_phone,
+                      b.name AS branch_name,w.name AS warehouse_name,
+                      u.full_name AS created_by_name,
+                      COALESCE(SUM(ri.line_total),0) AS total
+               FROM naeemsoft_wms.receipts r
+               JOIN naeemsoft_wms.suppliers s ON s.id=r.supplier_id
+               JOIN naeemsoft_wms.branches b ON b.id=r.branch_id
+               JOIN naeemsoft_wms.warehouses w ON w.id=r.warehouse_id
+               JOIN naeemsoft_wms.users u ON u.id=r.created_by
+               LEFT JOIN naeemsoft_wms.receipt_items ri ON ri.receipt_id=r.id
+               WHERE r.id=%s
+               GROUP BY r.id,s.name,s.phone,b.name,w.name,u.full_name""",
+            (receipt_id,),
+        ).fetchone()
+        if not header:
+            raise HTTPException(404,"فاتورة التوريد غير موجودة")
+        lines = conn.execute(
+            """SELECT ri.line_number,p.sku,p.name AS product_name,un.name AS unit_name,
+                      ri.quantity,ri.unit_cost,ri.line_total,ri.quantity_base,
+                      ri.supplier_batch_number,ri.expiry_date
+               FROM naeemsoft_wms.receipt_items ri
+               JOIN naeemsoft_wms.products p ON p.id=ri.product_id
+               JOIN naeemsoft_wms.product_units pu ON pu.id=ri.product_unit_id
+               JOIN naeemsoft_wms.units un ON un.id=pu.unit_id
+               WHERE ri.receipt_id=%s ORDER BY ri.line_number""",
+            (receipt_id,),
+        ).fetchall()
+        return {"document":dict(header),"items":[
+            {**dict(x),"quantity":float(x["quantity"]),"unit_cost":float(x["unit_cost"]),
+             "line_total":float(x["line_total"]),"quantity_base":float(x["quantity_base"])}
+            for x in lines
+        ]}
+
+
+@app.get("/api/issues/{issue_id}/document", dependencies=[Depends(require_api_key)])
+def get_issue_document(issue_id: UUID):
+    with db() as conn:
+        header = conn.execute(
+            """SELECT i.id,i.issue_number,i.status,i.issue_date,i.currency_code,i.notes,
+                      r.name AS party_name,r.phone AS party_phone,b.name AS branch_name,
+                      w.name AS warehouse_name,u.full_name AS created_by_name,
+                      COALESCE(SUM(ii.line_total),0) AS total
+               FROM naeemsoft_wms.issues i
+               JOIN naeemsoft_wms.recipients r ON r.id=i.recipient_id
+               JOIN naeemsoft_wms.branches b ON b.id=i.branch_id
+               JOIN naeemsoft_wms.warehouses w ON w.id=i.warehouse_id
+               JOIN naeemsoft_wms.users u ON u.id=i.created_by
+               LEFT JOIN naeemsoft_wms.issue_items ii ON ii.issue_id=i.id
+               WHERE i.id=%s
+               GROUP BY i.id,r.name,r.phone,b.name,w.name,u.full_name""",
+            (issue_id,),
+        ).fetchone()
+        if not header:
+            raise HTTPException(404,"مستند الصرف غير موجود")
+        lines = conn.execute(
+            """SELECT ii.line_number,p.sku,p.name AS product_name,un.name AS unit_name,
+                      ii.quantity,ii.unit_price,ii.line_total,ii.quantity_base
+               FROM naeemsoft_wms.issue_items ii
+               JOIN naeemsoft_wms.products p ON p.id=ii.product_id
+               JOIN naeemsoft_wms.product_units pu ON pu.id=ii.product_unit_id
+               JOIN naeemsoft_wms.units un ON un.id=pu.unit_id
+               WHERE ii.issue_id=%s ORDER BY ii.line_number""",
+            (issue_id,),
+        ).fetchall()
+        return {"document":dict(header),"items":[
+            {**dict(x),"quantity":float(x["quantity"]),"unit_price":float(x["unit_price"]),
+             "line_total":float(x["line_total"]),"quantity_base":float(x["quantity_base"])}
+            for x in lines
+        ]}
