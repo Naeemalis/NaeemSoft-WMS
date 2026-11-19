@@ -107,6 +107,9 @@ class _NaeemWmsAppState extends State<NaeemWmsApp> {
       ProductsPage(api: api),
       StockPage(api: api),
       ReceiptsPage(api: api),
+      IssuesPage(api: api),
+      AccountsPage(api: api),
+      AvailabilityPage(api: api),
       SettingsPage(
         baseUrl: _baseUrl,
         apiKey: _apiKey,
@@ -145,7 +148,7 @@ class _NaeemWmsAppState extends State<NaeemWmsApp> {
                 actions: [
                   IconButton(
                     tooltip: 'الإعدادات',
-                    onPressed: () => setState(() => _tab = 4),
+                    onPressed: () => setState(() => _tab = 7),
                     icon: const Icon(Icons.settings_outlined),
                   ),
                 ],
@@ -175,6 +178,9 @@ class _NaeemWmsAppState extends State<NaeemWmsApp> {
                     selectedIcon: Icon(Icons.local_shipping),
                     label: 'التوريد',
                   ),
+                  NavigationDestination(icon: Icon(Icons.outbox_outlined), selectedIcon: Icon(Icons.outbox), label: 'كاشير الصرف'),
+                  NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'كشوف الحساب'),
+                  NavigationDestination(icon: Icon(Icons.notifications_active_outlined), selectedIcon: Icon(Icons.notifications_active), label: 'مراقبة المخزون'),
                   NavigationDestination(
                     icon: Icon(Icons.settings_outlined),
                     selectedIcon: Icon(Icons.settings),
@@ -899,6 +905,73 @@ class _NewReceiptDialogState extends State<NewReceiptDialog> {
           ),
         ],
       );
+}
+
+
+class IssuesPage extends StatefulWidget {
+  const IssuesPage({required this.api,super.key}); final WmsApi api;
+  @override State<IssuesPage> createState()=>_IssuesPageState();
+}
+class _IssuesPageState extends _RefreshableState<IssuesPage>{
+  late Future<List<dynamic>> future;
+  @override void initState(){super.initState();future=Future.wait([widget.api.get('/api/issues'),widget.api.get('/api/stock/available')]);}
+  @override Future<void> reload()async{setState(()=>future=Future.wait([widget.api.get('/api/issues'),widget.api.get('/api/stock/available')]));await future;}
+  Future<void> action(String id,String a)async{try{await widget.api.post('/api/issues/$id/$a');await reload();}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));}}
+  Future<void> addRecipient()async{final n=TextEditingController();final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('إضافة مستلم'),content:TextField(controller:n,decoration:const InputDecoration(labelText:'اسم المستلم أو الجهة')),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()async{if(n.text.trim().isEmpty)return;await widget.api.post('/api/recipients',{'name':n.text.trim()});if(ctx.mounted)Navigator.pop(ctx,true);},child:const Text('حفظ'))]));n.dispose();if(ok==true)await reload();}
+  Future<void> newIssue()async{final ok=await showDialog<bool>(context:context,builder:(_)=>IssueEntryDialog(api:widget.api));if(ok==true)await reload();}
+  @override Widget build(BuildContext context)=>PageFrame(child:FutureBuilder<List<dynamic>>(future:future,builder:(ctx,s){
+    if(s.hasError)return ErrorPanel(message:s.error.toString());if(!s.hasData)return const LoadingPanel();
+    final issues=s.data![0] as List;final available=s.data![1] as List;
+    return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      Row(children:[const Expanded(child:Text('كاشير الصرف بالجملة',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold))),IconButton(onPressed:addRecipient,icon:const Icon(Icons.person_add)),FilledButton(onPressed:newIssue,child:const Text('صرف جديد'))]),
+      Text('الأصناف المتاحة فقط: ${available.map((x)=>x['product_id']).toSet().length}'),
+      ...issues.map((x){final id=x['id'].toString(),st=x['status'].toString();return Card(child:ListTile(title:Text('${x['issue_number']} — ${x['recipient_name']}'),subtitle:Text('${x['issue_date']} • ${x['total']} ${x['currency_code']} • $st'),trailing:st=='draft'?TextButton(onPressed:()=>action(id,'submit'),child:const Text('إرسال للاعتماد')):st=='pending_approval'?FilledButton(onPressed:()=>action(id,'approve'),child:const Text('اعتماد التسليم')):const Icon(Icons.check_circle)));})
+    ]);
+  }));
+}
+class IssueEntryDialog extends StatefulWidget{const IssueEntryDialog({required this.api,super.key});final WmsApi api;@override State<IssueEntryDialog> createState()=>_IssueEntryDialogState();}
+class _IssueEntryDialogState extends State<IssueEntryDialog>{
+  late Future<List<dynamic>> future;final number=TextEditingController(),currency=TextEditingController();String? recipient;final selected=<String,Map<String,dynamic>>{};final quantities=<String,TextEditingController>{};bool saving=false;
+  @override void initState(){super.initState();future=Future.wait([widget.api.get('/api/recipients'),widget.api.get('/api/stock/available')]);}
+  @override void dispose(){number.dispose();currency.dispose();for(final x in quantities.values){x.dispose();}super.dispose();}
+  Future<void> save()async{if(recipient==null||number.text.trim().isEmpty||selected.isEmpty)return;final items=<Map<String,dynamic>>[];for(final e in selected.entries){final q=double.tryParse(quantities[e.key]!.text);if(q==null||q<=0)return;items.add({'product_unit_id':e.value['product_unit_id'],'quantity':q});}setState(()=>saving=true);try{await widget.api.post('/api/issues',{'recipient_id':recipient,'issue_number':number.text.trim(),'currency_code':currency.text.trim().toUpperCase(),'items':items});if(mounted)Navigator.pop(context,true);}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));}finally{if(mounted)setState(()=>saving=false);}}
+  @override Widget build(BuildContext context)=>AlertDialog(title:const Text('مستند صرف'),content:SizedBox(width:500,height:560,child:FutureBuilder<List<dynamic>>(future:future,builder:(ctx,s){
+    if(s.hasError)return ErrorPanel(message:s.error.toString());if(!s.hasData)return const LoadingPanel();final recipients=s.data![0] as List,products=s.data![1] as List;
+    return Column(children:[
+      TextField(controller:number,decoration:const InputDecoration(labelText:'رقم مستند الصرف')),
+      DropdownButtonFormField<String>(initialValue:recipient,decoration:const InputDecoration(labelText:'المستلم'),items:recipients.map((x)=>DropdownMenuItem<String>(value:x['id'].toString(),child:Text(x['name'].toString()))).toList(),onChanged:(v)=>setState(()=>recipient=v)),
+      TextField(controller:currency,decoration:const InputDecoration(labelText:'رمز العملة')),
+      const Align(alignment:Alignment.centerRight,child:Text('معرض الأصناف المتاحة')),
+      SizedBox(height:180,child:GridView.builder(gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,childAspectRatio:2.2),itemCount:products.length,itemBuilder:(ctx,i){final p=Map<String,dynamic>.from(products[i]);final k=p['product_unit_id'].toString();return Card(child:InkWell(onTap:(){setState((){selected[k]=p;quantities.putIfAbsent(k,()=>TextEditingController(text:'1'));});},child:Center(child:Text('${p['product_name']}\n${p['unit_name']} • متاح ${p['quantity_on_hand_base']}',textAlign:TextAlign.center,style:const TextStyle(fontSize:11))))); })),
+      Expanded(child:ListView(children:selected.entries.map((e)=>Row(children:[Expanded(child:Text('${e.value['product_name']} — ${e.value['unit_name']}')),SizedBox(width:85,child:TextField(controller:quantities[e.key],keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'الكمية'))),IconButton(onPressed:()=>setState(()=>selected.remove(e.key)),icon:const Icon(Icons.close))])).toList()))
+    ]);
+  })),actions:[TextButton(onPressed:()=>Navigator.pop(context,false),child:const Text('إلغاء')),FilledButton(onPressed:saving?null:save,child:Text(saving?'حفظ...':'حفظ كمسودة'))]);
+}
+class AccountsPage extends StatefulWidget{const AccountsPage({required this.api,super.key});final WmsApi api;@override State<AccountsPage> createState()=>_AccountsPageState();}
+class _AccountsPageState extends State<AccountsPage>{
+  bool supplier=true;String? party;late Future<dynamic> parties;Future<dynamic>? statement;
+  @override void initState(){super.initState();load();}
+  void load(){parties=widget.api.get(supplier?'/api/suppliers':'/api/recipients');party=null;statement=null;}
+  void switchType(bool v){setState((){supplier=v;load();});}
+  void choose(String? id){setState((){party=id;statement=id==null?null:widget.api.get(supplier?'/api/suppliers/$id/statement':'/api/recipients/$id/statement');});}
+  @override Widget build(BuildContext context)=>PageFrame(child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+    const Text('كشوف الحساب',style:TextStyle(fontSize:21,fontWeight:FontWeight.bold)),
+    SegmentedButton<bool>(segments:const [ButtonSegment(value:true,label:Text('المورد')),ButtonSegment(value:false,label:Text('المستلم'))],selected:{supplier},onSelectionChanged:(v)=>switchType(v.first)),
+    FutureBuilder<dynamic>(future:parties,builder:(ctx,s){if(s.hasError)return ErrorPanel(message:s.error.toString());if(!s.hasData)return const LoadingPanel();return DropdownButtonFormField<String>(initialValue:party,decoration:const InputDecoration(labelText:'اختر الحساب'),items:(s.data as List).map((x)=>DropdownMenuItem<String>(value:x['id'].toString(),child:Text(x['name'].toString()))).toList(),onChanged:choose);}),
+    if(statement!=null)FutureBuilder<dynamic>(future:statement,builder:(ctx,s){if(s.hasError)return ErrorPanel(message:s.error.toString());if(!s.hasData)return const LoadingPanel();final rows=s.data['entries'] as List;return Column(children:rows.map((x)=>Card(child:ListTile(title:Text('${x['description']} — ${x['document_number']}'),subtitle:Text('${x['entry_date']} • ${x['currency_code']}'),trailing:Column(mainAxisAlignment:MainAxisAlignment.center,crossAxisAlignment:CrossAxisAlignment.end,children:[Text('مدين ${x['debit']}'),Text('دائن ${x['credit']}'),Text('الرصيد ${x['running_balance']}',style:const TextStyle(fontWeight:FontWeight.bold))])))).toList());})
+  ]));
+}
+class AvailabilityPage extends StatefulWidget{const AvailabilityPage({required this.api,super.key});final WmsApi api;@override State<AvailabilityPage> createState()=>_AvailabilityPageState();}
+class _AvailabilityPageState extends _RefreshableState<AvailabilityPage>{
+  late Future<List<dynamic>> future;@override void initState(){super.initState();future=Future.wait([widget.api.get('/api/stock'),widget.api.get('/api/stock/expiry-alerts')]);}
+  @override Future<void> reload()async{setState(()=>future=Future.wait([widget.api.get('/api/stock'),widget.api.get('/api/stock/expiry-alerts')]));await future;}
+  @override Widget build(BuildContext context)=>PageFrame(child:FutureBuilder<List<dynamic>>(future:future,builder:(ctx,s){if(s.hasError)return ErrorPanel(message:s.error.toString());if(!s.hasData)return const LoadingPanel();final zero=(s.data![0] as List).where((x)=>(x['quantity_on_hand_base'] as num)<=0);final expiry=s.data![1] as List;return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+    const Text('مراقبة المخزون والتوريد',style:TextStyle(fontSize:21,fontWeight:FontWeight.bold)),
+    Text('أصناف رصيدها صفر — مطلوبة للتوريد: ${zero.length}'),
+    ...zero.map((x)=>ListTile(leading:const Icon(Icons.warning_amber,color:Colors.orange),title:Text(x['product_name'].toString()),subtitle:const Text('غير متاح في كاشير الصرف'))),
+    const Divider(),const Text('دفعات تنتهي خلال شهر',style:TextStyle(fontWeight:FontWeight.bold)),
+    ...expiry.map((x)=>Card(color:Colors.green.shade100,child:ListTile(title:Text(x['product_name'].toString()),subtitle:Text('انتهاء ${x['expiry_date']} • كمية ${x['quantity_on_hand_base']}'),trailing:Text('${x['days_until_expiry']} يوم'))))
+  ]);}));
 }
 
 class SettingsPage extends StatefulWidget {
