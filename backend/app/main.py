@@ -623,3 +623,69 @@ def create_recipient_payment(recipient_id: UUID, payload: AccountPaymentCreate):
              payload.amount,payload.notes,user_id),
         ).fetchone()
         return dict(row)
+
+
+# ---- Product lifecycle traceability (migration 009) ----
+
+class ReorderLevelUpdate(BaseModel):
+    reorder_level_base: float = Field(ge=0)
+
+
+@app.get("/api/products/{product_id}/movements", dependencies=[Depends(require_api_key)])
+def product_movement_history(product_id: UUID):
+    with db() as conn:
+        product = conn.execute(
+            "SELECT id,sku,name FROM naeemsoft_wms.products WHERE id=%s",
+            (product_id,),
+        ).fetchone()
+        if not product:
+            raise HTTPException(404, "الصنف غير موجود")
+        rows = conn.execute(
+            """SELECT l.warehouse_id,w.name AS warehouse_name,l.batch_id,
+                      l.movement_type,l.direction,l.quantity_base,l.signed_quantity_base,
+                      l.source_document_type,l.source_document_id,l.source_line_id,
+                      l.created_at,l.notes,u.full_name AS performed_by
+               FROM naeemsoft_wms.v_product_movement_ledger l
+               JOIN naeemsoft_wms.warehouses w ON w.id=l.warehouse_id
+               LEFT JOIN naeemsoft_wms.users u ON u.id=l.created_by
+               WHERE l.product_id=%s
+               ORDER BY l.created_at DESC,l.source_document_id DESC
+               LIMIT 1000""",
+            (product_id,),
+        ).fetchall()
+        return {"product":dict(product),"movements":[
+            {**dict(row),"quantity_base":float(row["quantity_base"]),
+             "signed_quantity_base":float(row["signed_quantity_base"])}
+            for row in rows
+        ]}
+
+
+@app.get("/api/stock/reorder-alerts", dependencies=[Depends(require_api_key)])
+def list_reorder_alerts():
+    with db() as conn:
+        _, warehouse_id = default_location(conn)
+        rows = conn.execute(
+            """SELECT a.product_id,a.sku,a.product_name,a.reorder_level_base,
+                      COALESCE(ih.quantity_on_hand_base,0) AS quantity_on_hand_base
+               FROM naeemsoft_wms.v_reorder_alerts a
+               LEFT JOIN naeemsoft_wms.v_inventory_on_hand ih
+                 ON ih.product_id=a.product_id AND ih.warehouse_id=%s
+               ORDER BY a.product_name""",
+            (warehouse_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+@app.patch("/api/products/{product_id}/reorder-level", dependencies=[Depends(require_api_key)])
+def update_product_reorder_level(product_id: UUID, payload: ReorderLevelUpdate):
+    with db() as conn:
+        row = conn.execute(
+            """UPDATE naeemsoft_wms.products
+               SET reorder_level_base=%s,updated_at=now()
+               WHERE id=%s AND is_active=true
+               RETURNING id,sku,name,reorder_level_base""",
+            (payload.reorder_level_base,product_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404,"الصنف غير موجود أو غير نشط")
+        return {**dict(row),"reorder_level_base":float(row["reorder_level_base"])}
