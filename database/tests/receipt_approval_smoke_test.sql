@@ -1,5 +1,5 @@
 -- NaeemSoft-WMS smoke test: product -> draft receipt -> pending -> approved.
--- Run after migrations 001 through 005. All test rows are rolled back.
+-- Run after migrations 001 through 006. All test rows are rolled back.
 
 BEGIN;
 SET search_path TO naeemsoft_wms, public;
@@ -15,6 +15,9 @@ DECLARE
     v_pack_unit_id uuid;
     v_carton_unit_id uuid;
     v_receipt_id uuid;
+    v_recipient_id uuid;
+    v_issue_id uuid;
+    v_statement_total numeric(24,6);
     v_on_hand numeric(24,6);
     v_movement_count integer;
 BEGIN
@@ -140,7 +143,50 @@ BEGIN
             v_on_hand, v_movement_count;
     END IF;
 
-    RAISE NOTICE 'PASS: 5 cartons x 240 = 1200 pieces; draft/pending stock stayed zero; approval posted once.';
+    -- Wholesale issue: a pending issue must not reduce stock; approval must.
+    INSERT INTO recipients(name) VALUES ('Test Recipient') RETURNING id INTO v_recipient_id;
+    INSERT INTO issues(branch_id,warehouse_id,recipient_id,issue_number,currency_code,created_by)
+    VALUES (v_branch_id,v_warehouse_id,v_recipient_id,'TEST-ISS-001','TST',v_user_id)
+    RETURNING id INTO v_issue_id;
+
+    INSERT INTO issue_items(issue_id,line_number,product_id,product_unit_id,quantity,conversion_factor_snapshot,unit_price)
+    VALUES (v_issue_id,1,v_product_id,v_carton_unit_id,1,240,1500);
+
+    PERFORM submit_issue_for_approval(v_issue_id,v_user_id);
+    SELECT quantity_on_hand_base INTO v_on_hand
+      FROM v_inventory_on_hand WHERE warehouse_id=v_warehouse_id AND product_id=v_product_id;
+    IF v_on_hand <> 1200 THEN
+        RAISE EXCEPTION 'Pending issue changed stock; expected 1200, got %',v_on_hand;
+    END IF;
+
+    PERFORM approve_issue(v_issue_id,v_user_id);
+    SELECT quantity_on_hand_base INTO v_on_hand
+      FROM v_inventory_on_hand WHERE warehouse_id=v_warehouse_id AND product_id=v_product_id;
+    IF v_on_hand <> 960 THEN
+        RAISE EXCEPTION 'Approved issue stock mismatch; expected 960, got %',v_on_hand;
+    END IF;
+
+    PERFORM approve_issue(v_issue_id,v_user_id);
+    SELECT quantity_on_hand_base INTO v_on_hand
+      FROM v_inventory_on_hand WHERE warehouse_id=v_warehouse_id AND product_id=v_product_id;
+    IF v_on_hand <> 960 THEN
+        RAISE EXCEPTION 'Repeated issue approval changed stock; expected 960, got %',v_on_hand;
+    END IF;
+
+    SELECT SUM(debit-credit) INTO v_statement_total
+      FROM v_supplier_statement_entries WHERE supplier_id=v_supplier_id AND currency_code='TST';
+    IF v_statement_total <> 5000 THEN
+        RAISE EXCEPTION 'Supplier statement mismatch; expected 5000, got %',v_statement_total;
+    END IF;
+
+    SELECT SUM(debit-credit) INTO v_statement_total
+      FROM v_recipient_statement_entries WHERE recipient_id=v_recipient_id AND currency_code='TST';
+    IF v_statement_total <> 1500 THEN
+        RAISE EXCEPTION 'Recipient statement mismatch; expected 1500, got %',v_statement_total;
+    END IF;
+
+    RAISE NOTICE 'PASS: receipt approval, issue approval, no duplicate posting, supplier and recipient statement totals.';
+
 END;
 $$;
 
