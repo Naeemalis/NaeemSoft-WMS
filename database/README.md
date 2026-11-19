@@ -11,6 +11,7 @@ PostgreSQL schema migrations are applied in numeric order.
 5. `005_integrity_guards.sql` — receipt immutability, append-only ledgers and balance guards.
 6. `006_issue_accounts_and_availability.sql` — recipients, wholesale issues, payment entries, account statement views, available-stock catalogue and expiry alerts.
 7. `007_receipt_retry_after_batch_allocation.sql` — preserves safe receipt retries after allowing issue lines to consume multiple batches.
+8. `008_issue_catalogue_base_unit_display.sql` — adds the base-unit label to each available-stock unit option.
 
 The schema is `naeemsoft_wms`.
 
