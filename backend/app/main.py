@@ -506,14 +506,18 @@ def create_issue(payload: IssueCreate):
             ).fetchone()
             for index,line in enumerate(payload.items,start=1):
                 unit = conn.execute(
-                    """SELECT pu.product_id,pu.factor_to_base,pu.is_sale_allowed,pup.sale_price
+                    """SELECT pu.product_id,pu.factor_to_base,pu.is_sale_allowed,pup.sale_price,u.code AS unit_code,u.name AS unit_name
                        FROM naeemsoft_wms.product_units pu
+                       JOIN naeemsoft_wms.units u ON u.id=pu.unit_id
                        LEFT JOIN naeemsoft_wms.product_unit_prices pup ON pup.product_unit_id=pu.id
                        WHERE pu.id=%s AND pu.is_active=true""",
                     (line.product_unit_id,),
                 ).fetchone()
                 if not unit or not unit["is_sale_allowed"]:
                     raise HTTPException(422, f"وحدة الصرف غير صالحة في السطر {index}")
+                allowed_units = {"carton", "pack", "piece", "كرتون", "باكت", "حبة", "حبه"}
+                if unit["unit_code"].lower() not in allowed_units and unit["unit_name"].lower() not in allowed_units:
+                    raise HTTPException(422, f"وحدات الصرف المعتمدة هي كرتون وباكت وحبة (السطر {index})")
                 price = line.unit_price if line.unit_price is not None else unit["sale_price"]
                 if price is None:
                     raise HTTPException(422, f"لا يوجد سعر بيع محدد لوحدة السطر {index}")
