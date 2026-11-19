@@ -665,12 +665,10 @@ def list_reorder_alerts():
     with db() as conn:
         _, warehouse_id = default_location(conn)
         rows = conn.execute(
-            """SELECT a.product_id,a.sku,a.product_name,a.reorder_level_base,
-                      COALESCE(ih.quantity_on_hand_base,0) AS quantity_on_hand_base
-               FROM naeemsoft_wms.v_reorder_alerts a
-               LEFT JOIN naeemsoft_wms.v_inventory_on_hand ih
-                 ON ih.product_id=a.product_id AND ih.warehouse_id=%s
-               ORDER BY a.product_name""",
+            """SELECT product_id,sku,product_name,reorder_level_base,quantity_on_hand_base
+               FROM naeemsoft_wms.v_reorder_alerts
+               WHERE warehouse_id=%s
+               ORDER BY product_name""",
             (warehouse_id,),
         ).fetchall()
         return [dict(row) for row in rows]
