@@ -1,53 +1,32 @@
 # NaeemSoft-WMS — Database
 
-The first database implementation is organized as ordered PostgreSQL migrations.
+PostgreSQL schema migrations are applied in numeric order.
 
 ## Apply order
 
-Run these files against a new PostgreSQL database, in order:
+1. `001_core.sql` — organization, products, units and prices.
+2. `002_receiving.sql` — suppliers, receipt headers/lines and expiry batches.
+3. `003_inventory.sql` — immutable stock movement ledger, balances and stock views.
+4. `004_receipt_workflow_audit_views.sql` — receipt submission/approval, audit and totals.
+5. `005_integrity_guards.sql` — receipt immutability, append-only ledgers and balance guards.
+6. `006_issue_accounts_and_availability.sql` — recipients, wholesale issues, payment entries, account statement views, available-stock catalogue and expiry alerts.
 
-1. [001_core.sql](migrations/001_core.sql) — branches, warehouses, users, roles, currencies, categories, units, products, per-unit sale prices and price history.
-2. [002_receiving.sql](migrations/002_receiving.sql) — suppliers, receipt headers and lines, supplier batch/expiry data.
-3. [003_inventory.sql](migrations/003_inventory.sql) — immutable stock movement ledger, inventory balances and operational stock views.
-4. [004_receipt_workflow_audit_views.sql](migrations/004_receipt_workflow_audit_views.sql) — receipt submission/approval functions, price completeness check, audit log and receipt totals.
-5. [005_integrity_guards.sql](migrations/005_integrity_guards.sql) — receipt immutability, append-only ledgers and protection against direct balance edits.
+The schema is `naeemsoft_wms`.
 
-The schema is created under `naeemsoft_wms`.
+## Confirmed rules
 
-## Confirmed business rules represented
+- Products are defined before receiving. Each has exactly one base unit.
+- Unit conversion factors are product-specific. Stock is held in the smallest/base unit.
+- Each sale-enabled unit has its own manually entered price.
+- Receipt drafts and pending approvals do not affect stock. Approval posts each receipt once and creates a traceable batch.
+- Issue drafts and pending approvals do not affect stock. Approval posts OUT movements, allocates batches by earliest expiry date first and fails atomically if stock is insufficient.
+- The wholesale issue catalogue includes only product units belonging to products with positive available stock.
+- Expiry alert view reports batches with stock and expiry dates within the next 30 days.
+- Supplier statements include approved receipt debits and supplier settlement credits.
+- Recipient statements include approved issue debits and recipient collection credits.
+- Statement balances are partitioned by currency; different currencies are never added together.
+- Inventory balances are a projection of the append-only stock movement ledger.
 
-- A product is defined before its first receipt and can appear in the sales catalogue with zero stock.
-- Each product has exactly one smallest/base unit; all other product units store their own conversion factor to that base unit.
-- Every sale-enabled product unit must have its own manually entered sale price. Prices are not derived automatically from the base-unit price.
-- Receipt quantities are converted and snapshotted in the smallest unit.
-- Draft and pending-approval receipts do not affect stock.
-- Receipt approval creates stock batches and stock movements exactly once.
-- Inventory balances are maintained from the stock movement ledger; direct balance edits are rejected.
-- A sale/issue movement that would make a batch balance negative is rejected.
-- Product-unit prices, stock movements and audit history are append-only/history-preserving as appropriate.
+## Important limitations
 
-## Example unit setup
-
-For a pen product:
-
-| Unit | factor_to_base | is_base |
-|---|---:|---|
-| Piece | 1 | true |
-| Pack | 10 | false |
-| Carton | 240 | false |
-
-The database stores stock in pieces. The sales application decomposes a requested quantity into the largest applicable packs/cartons and the remainder, then uses each unit's independent sale price.
-
-## Receipt workflow
-
-1. Create a receipt in `draft`.
-2. Add receipt lines while it remains a draft.
-3. Call `submit_receipt_for_approval(receipt_id, user_id)`.
-4. Call `approve_receipt(receipt_id, user_id)` after authorization.
-5. Read available stock from `v_inventory_on_hand` or `v_products_for_sales`.
-
-Calling `approve_receipt` again for an already approved receipt is a safe no-op.
-
-## Not yet included
-
-The database valuation method (FIFO vs weighted average), sales and quotation documents, customer/supplier account statements, return workflows, exchange-rate history, competitor intelligence, and branch-transfer workflow remain subsequent implementation stages. No valuation method has been silently selected.
+The current statement views do not yet include supplier returns or recipient returns. Payment workflows record account entries but are not yet connected to a cash/bank register. Minimum-stock thresholds have not been configured because the per-product threshold policy is still undecided. Stock valuation (FIFO vs weighted average), stock counts, transfers and full role-based authorization remain subsequent work.
