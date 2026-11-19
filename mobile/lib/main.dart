@@ -985,7 +985,7 @@ class _IssueEntryDialogState extends State<IssueEntryDialog>{
       DropdownButtonFormField<String>(initialValue:recipient,decoration:const InputDecoration(labelText:'المستلم'),items:recipients.map((x)=>DropdownMenuItem<String>(value:x['id'].toString(),child:Text(x['name'].toString()))).toList(),onChanged:(v)=>setState(()=>recipient=v)),
       TextField(controller:currency,decoration:const InputDecoration(labelText:'رمز العملة')),
       const Align(alignment:Alignment.centerRight,child:Text('معرض الأصناف المتاحة')),
-      SizedBox(height:180,child:GridView.builder(gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,childAspectRatio:2.2),itemCount:products.length,itemBuilder:(ctx,i){final p=Map<String,dynamic>.from(products[i]);final k=p['product_unit_id'].toString();return Card(child:InkWell(onTap:(){setState((){selected[k]=p;quantities.putIfAbsent(k,()=>TextEditingController(text:'1'));});},child:Center(child:Text('${p['product_name']}\n${p['unit_name']} • متاح ${p['quantity_on_hand_base']}',textAlign:TextAlign.center,style:const TextStyle(fontSize:11))))); })),
+      SizedBox(height:180,child:GridView.builder(gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,childAspectRatio:2.2),itemCount:products.length,itemBuilder:(ctx,i){final p=Map<String,dynamic>.from(products[i]);final k=p['product_unit_id'].toString();return Card(child:InkWell(onTap:(){setState((){selected[k]=p;quantities.putIfAbsent(k,()=>TextEditingController(text:'1'));});},child:Center(child:Text('${p['product_name']}\n${p['unit_name']} • المتاح ${p['quantity_on_hand_base']} ${p['base_unit_name']}',textAlign:TextAlign.center,style:const TextStyle(fontSize:11))))); })),
       Expanded(child:ListView(children:selected.entries.map((e)=>Row(children:[Expanded(child:Text('${e.value['product_name']} — ${e.value['unit_name']}')),SizedBox(width:85,child:TextField(controller:quantities[e.key],keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'الكمية'))),IconButton(onPressed:()=>setState(()=>selected.remove(e.key)),icon:const Icon(Icons.close))])).toList()))
     ]);
   })),actions:[TextButton(onPressed:()=>Navigator.pop(context,false),child:const Text('إلغاء')),FilledButton(onPressed:saving?null:save,child:Text(saving?'حفظ...':'حفظ كمسودة'))]);
@@ -1041,7 +1041,7 @@ class _AvailabilityPageState extends _RefreshableState<AvailabilityPage>{
     Text('أصناف رصيدها صفر — مطلوبة للتوريد: ${zero.length}'),
     ...zero.map((x)=>ListTile(leading:const Icon(Icons.warning_amber,color:Colors.orange),title:Text(x['product_name'].toString()),subtitle:const Text('غير متاح في كاشير الصرف'))),
     const Divider(),const Text('دفعات تنتهي خلال شهر',style:TextStyle(fontWeight:FontWeight.bold)),
-    ...expiry.map((x)=>Card(color:Colors.green.shade100,child:ListTile(title:Text(x['product_name'].toString()),subtitle:Text('انتهاء ${x['expiry_date']} • كمية ${x['quantity_on_hand_base']}'),trailing:Text('${x['days_until_expiry']} يوم'))))
+    ...expiry.map((x)=>Card(color:(x['days_until_expiry'] as num).toInt()<0?Colors.red.shade100:Colors.green.shade100,child:ListTile(title:Text(x['product_name'].toString()),subtitle:Text('انتهاء ${x['expiry_date']} • كمية ${x['quantity_on_hand_base']}'),trailing:Text('${x['days_until_expiry']} يوم'))))
   ]);}));
 }
 
