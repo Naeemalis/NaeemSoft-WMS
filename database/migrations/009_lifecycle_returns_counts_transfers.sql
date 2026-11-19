@@ -124,13 +124,15 @@ FROM stock_movements sm
 JOIN products p ON p.id=sm.product_id;
 
 CREATE OR REPLACE VIEW v_reorder_alerts AS
-SELECT p.id AS product_id, p.sku, p.name AS product_name,
+SELECT w.id AS warehouse_id, p.id AS product_id, p.sku, p.name AS product_name,
        p.reorder_level_base,
        COALESCE(SUM(ib.quantity_on_hand_base),0) AS quantity_on_hand_base
-FROM products p
-LEFT JOIN inventory_balances ib ON ib.product_id=p.id
-WHERE p.is_active=true AND p.reorder_level_base>0
-GROUP BY p.id,p.sku,p.name,p.reorder_level_base
+FROM warehouses w
+CROSS JOIN products p
+LEFT JOIN inventory_balances ib
+  ON ib.warehouse_id=w.id AND ib.product_id=p.id
+WHERE w.is_active=true AND p.is_active=true AND p.reorder_level_base>0
+GROUP BY w.id,p.id,p.sku,p.name,p.reorder_level_base
 HAVING COALESCE(SUM(ib.quantity_on_hand_base),0) <= p.reorder_level_base;
 
 CREATE INDEX IF NOT EXISTS ix_stock_returns_party ON stock_returns(supplier_id,recipient_id,created_at DESC);
