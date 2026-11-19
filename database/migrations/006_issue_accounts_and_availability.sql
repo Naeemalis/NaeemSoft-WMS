@@ -2,6 +2,10 @@
 BEGIN;
 SET search_path TO naeemsoft_wms, public;
 
+ALTER TABLE stock_movements DROP CONSTRAINT IF EXISTS uq_movement_source_once;
+CREATE UNIQUE INDEX uq_movement_source_batch_once
+    ON stock_movements(source_document_type, source_document_id, source_line_id, movement_type, batch_id);
+
 CREATE TABLE recipients (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     recipient_code varchar(50) UNIQUE,
