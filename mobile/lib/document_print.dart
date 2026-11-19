@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -53,7 +55,7 @@ class _DocumentPrintPageState extends State<DocumentPrintPage> {
         _ => status?.toString() ?? '-',
       };
 
-  Future<List<int>> _buildPdf(PdfPageFormat format, Map<String, dynamic> data) async {
+  Future<Uint8List> _buildPdf(PdfPageFormat format, Map<String, dynamic> data) async {
     final header = Map<String, dynamic>.from(data['document'] as Map);
     final items = (data['items'] as List).cast<Map>();
     final font = await PdfGoogleFonts.notoSansArabicRegular();
