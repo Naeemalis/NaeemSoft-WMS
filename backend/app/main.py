@@ -390,3 +390,230 @@ def approve_receipt(receipt_id: UUID):
             (receipt_id, user_id),
         )
         return {"id": str(receipt_id), "status": "approved"}
+
+
+# ---- Issue cashier, account statements and stock availability (milestone 0.2) ----
+
+class RecipientCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=180)
+    recipient_code: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    notes: str | None = None
+
+
+class IssueLineInput(BaseModel):
+    product_unit_id: UUID
+    quantity: float = Field(gt=0)
+    unit_price: float | None = Field(default=None, ge=0)
+
+
+class IssueCreate(BaseModel):
+    recipient_id: UUID
+    issue_number: str = Field(min_length=1, max_length=60)
+    currency_code: str = Field(min_length=3, max_length=3)
+    notes: str | None = None
+    items: list[IssueLineInput] = Field(min_length=1)
+
+
+class AccountPaymentCreate(BaseModel):
+    payment_number: str = Field(min_length=1, max_length=60)
+    currency_code: str = Field(min_length=3, max_length=3)
+    amount: float = Field(gt=0)
+    payment_date: str | None = None
+    notes: str | None = None
+
+
+@app.get("/api/recipients", dependencies=[Depends(require_api_key)])
+def list_recipients():
+    with db() as conn:
+        rows = conn.execute(
+            """SELECT id, recipient_code, name, phone, address, notes
+               FROM naeemsoft_wms.recipients WHERE is_active=true ORDER BY name"""
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+@app.post("/api/recipients", status_code=201, dependencies=[Depends(require_api_key)])
+def create_recipient(payload: RecipientCreate):
+    with db() as conn:
+        row = conn.execute(
+            """INSERT INTO naeemsoft_wms.recipients(recipient_code,name,phone,address,notes)
+               VALUES (%s,%s,%s,%s,%s) RETURNING id,recipient_code,name""",
+            (payload.recipient_code, payload.name.strip(), payload.phone, payload.address, payload.notes),
+        ).fetchone()
+        return dict(row)
+
+
+@app.get("/api/stock/available", dependencies=[Depends(require_api_key)])
+def list_available_stock():
+    with db() as conn:
+        _, warehouse_id = default_location(conn)
+        rows = conn.execute(
+            """SELECT product_id, sku, product_name, product_unit_id, unit_code,
+                      unit_name, factor_to_base, sale_price, currency_code,
+                      quantity_on_hand_base
+               FROM naeemsoft_wms.v_products_available_for_issue
+               WHERE warehouse_id=%s ORDER BY product_name, factor_to_base DESC""",
+            (warehouse_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+@app.get("/api/stock/expiry-alerts", dependencies=[Depends(require_api_key)])
+def list_expiry_alerts():
+    with db() as conn:
+        _, warehouse_id = default_location(conn)
+        rows = conn.execute(
+            """SELECT product_id,sku,product_name,batch_id,batch_number,expiry_date,
+                      quantity_on_hand_base,days_until_expiry
+               FROM naeemsoft_wms.v_expiry_alerts
+               WHERE warehouse_id=%s ORDER BY expiry_date,product_name""",
+            (warehouse_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+@app.get("/api/issues", dependencies=[Depends(require_api_key)])
+def list_issues():
+    with db() as conn:
+        rows = conn.execute(
+            """SELECT i.id,i.issue_number,i.issue_date,i.status,i.currency_code,
+                      r.name AS recipient_name,COALESCE(SUM(ii.line_total),0) AS total
+               FROM naeemsoft_wms.issues i
+               JOIN naeemsoft_wms.recipients r ON r.id=i.recipient_id
+               LEFT JOIN naeemsoft_wms.issue_items ii ON ii.issue_id=i.id
+               GROUP BY i.id,r.name ORDER BY i.created_at DESC LIMIT 100"""
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+@app.post("/api/issues", status_code=201, dependencies=[Depends(require_api_key)])
+def create_issue(payload: IssueCreate):
+    with db() as conn:
+        user_id = actor_id(conn)
+        branch_id, warehouse_id = default_location(conn)
+        with conn.transaction():
+            header = conn.execute(
+                """INSERT INTO naeemsoft_wms.issues(
+                       branch_id,warehouse_id,recipient_id,issue_number,currency_code,notes,created_by
+                   ) VALUES (%s,%s,%s,%s,%s,%s,%s)
+                   RETURNING id,issue_number,status""",
+                (branch_id,warehouse_id,payload.recipient_id,payload.issue_number,
+                 payload.currency_code.upper(),payload.notes,user_id),
+            ).fetchone()
+            for index,line in enumerate(payload.items,start=1):
+                unit = conn.execute(
+                    """SELECT pu.product_id,pu.factor_to_base,pu.is_sale_allowed,pup.sale_price
+                       FROM naeemsoft_wms.product_units pu
+                       LEFT JOIN naeemsoft_wms.product_unit_prices pup ON pup.product_unit_id=pu.id
+                       WHERE pu.id=%s AND pu.is_active=true""",
+                    (line.product_unit_id,),
+                ).fetchone()
+                if not unit or not unit["is_sale_allowed"]:
+                    raise HTTPException(422, f"وحدة الصرف غير صالحة في السطر {index}")
+                price = line.unit_price if line.unit_price is not None else unit["sale_price"]
+                if price is None:
+                    raise HTTPException(422, f"لا يوجد سعر بيع محدد لوحدة السطر {index}")
+                conn.execute(
+                    """INSERT INTO naeemsoft_wms.issue_items(
+                           issue_id,line_number,product_id,product_unit_id,quantity,
+                           conversion_factor_snapshot,unit_price
+                       ) VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                    (header["id"],index,unit["product_id"],line.product_unit_id,
+                     line.quantity,unit["factor_to_base"],price),
+                )
+        return {"id":str(header["id"]),"issue_number":header["issue_number"],"status":header["status"]}
+
+
+@app.post("/api/issues/{issue_id}/submit", dependencies=[Depends(require_api_key)])
+def submit_issue(issue_id: UUID):
+    with db() as conn:
+        conn.execute(
+            "SELECT naeemsoft_wms.submit_issue_for_approval(%s,%s)",
+            (issue_id,actor_id(conn)),
+        )
+        return {"id":str(issue_id),"status":"pending_approval"}
+
+
+@app.post("/api/issues/{issue_id}/approve", dependencies=[Depends(require_api_key)])
+def approve_issue(issue_id: UUID):
+    with db() as conn:
+        conn.execute(
+            "SELECT naeemsoft_wms.approve_issue(%s,%s)",
+            (issue_id,actor_id(conn)),
+        )
+        return {"id":str(issue_id),"status":"approved"}
+
+
+def _statement_rows(conn, view_name: str, party_column: str, party_id: UUID):
+    # view_name/party_column are fixed internal constants, never request values.
+    rows = conn.execute(
+        f"""SELECT entry_date,document_number,description,currency_code,debit,credit,
+                    SUM(debit-credit) OVER (
+                      PARTITION BY currency_code
+                      ORDER BY entry_date,document_number,document_id
+                      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                    ) AS running_balance
+             FROM naeemsoft_wms.{view_name}
+             WHERE {party_column}=%s
+             ORDER BY currency_code,entry_date,document_number,document_id""",
+        (party_id,),
+    ).fetchall()
+    return [
+        {**dict(row),"debit":float(row["debit"]),"credit":float(row["credit"]),
+         "running_balance":float(row["running_balance"])}
+        for row in rows
+    ]
+
+
+@app.get("/api/suppliers/{supplier_id}/statement", dependencies=[Depends(require_api_key)])
+def supplier_statement(supplier_id: UUID):
+    with db() as conn:
+        supplier = conn.execute(
+            "SELECT id,name FROM naeemsoft_wms.suppliers WHERE id=%s",(supplier_id,)
+        ).fetchone()
+        if not supplier: raise HTTPException(404,"المورد غير موجود")
+        entries = _statement_rows(conn,"v_supplier_statement_entries","supplier_id",supplier_id)
+        return {"party":dict(supplier),"entries":entries}
+
+
+@app.post("/api/suppliers/{supplier_id}/payments", status_code=201, dependencies=[Depends(require_api_key)])
+def create_supplier_payment(supplier_id: UUID, payload: AccountPaymentCreate):
+    with db() as conn:
+        user_id=actor_id(conn)
+        row=conn.execute(
+            """INSERT INTO naeemsoft_wms.supplier_payments(
+                   supplier_id,payment_number,payment_date,currency_code,amount,notes,created_by
+               ) VALUES (%s,%s,COALESCE(%s::date,current_date),%s,%s,%s,%s)
+               RETURNING id,payment_number,amount,currency_code,payment_date""",
+            (supplier_id,payload.payment_number,payload.payment_date,payload.currency_code.upper(),
+             payload.amount,payload.notes,user_id),
+        ).fetchone()
+        return dict(row)
+
+
+@app.get("/api/recipients/{recipient_id}/statement", dependencies=[Depends(require_api_key)])
+def recipient_statement(recipient_id: UUID):
+    with db() as conn:
+        recipient=conn.execute(
+            "SELECT id,name FROM naeemsoft_wms.recipients WHERE id=%s",(recipient_id,)
+        ).fetchone()
+        if not recipient: raise HTTPException(404,"المستلم غير موجود")
+        entries=_statement_rows(conn,"v_recipient_statement_entries","recipient_id",recipient_id)
+        return {"party":dict(recipient),"entries":entries}
+
+
+@app.post("/api/recipients/{recipient_id}/payments", status_code=201, dependencies=[Depends(require_api_key)])
+def create_recipient_payment(recipient_id: UUID, payload: AccountPaymentCreate):
+    with db() as conn:
+        user_id=actor_id(conn)
+        row=conn.execute(
+            """INSERT INTO naeemsoft_wms.recipient_payments(
+                   recipient_id,payment_number,payment_date,currency_code,amount,notes,created_by
+               ) VALUES (%s,%s,COALESCE(%s::date,current_date),%s,%s,%s,%s)
+               RETURNING id,payment_number,amount,currency_code,payment_date""",
+            (recipient_id,payload.payment_number,payload.payment_date,payload.currency_code.upper(),
+             payload.amount,payload.notes,user_id),
+        ).fetchone()
+        return dict(row)
