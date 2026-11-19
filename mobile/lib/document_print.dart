@@ -1,5 +1,8 @@
 import 'dart:typed_data';
 
+// Material widgets are required for this document preview route.
+// Keep this import compatible with Flutter SDKs that deprecate the umbrella library.
+ // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
