@@ -25,6 +25,7 @@ JOIN product_units bu ON bu.product_id=p.id AND bu.is_base=true
 JOIN units buu ON buu.id=bu.unit_id
 LEFT JOIN product_unit_prices pup ON pup.product_unit_id=pu.id
 WHERE w.is_active AND COALESCE(v.quantity_on_hand_base,0)>0
-  AND lower(u.code) IN ('carton','pack','piece','كرتون','باكت','حبة','حبه');
+  AND (lower(u.code) IN ('carton','pack','piece','كرتون','باكت','حبة','حبه')
+       OR lower(u.name) IN ('carton','pack','piece','كرتون','باكت','حبة','حبه'));
 
 COMMIT;
