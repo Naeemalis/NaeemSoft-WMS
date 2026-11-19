@@ -2,7 +2,8 @@
 BEGIN;
 SET search_path TO naeemsoft_wms, public;
 
-CREATE OR REPLACE VIEW v_products_available_for_issue AS
+DROP VIEW IF EXISTS v_products_available_for_issue;
+CREATE VIEW v_products_available_for_issue AS
 SELECT w.id AS warehouse_id,
        p.id AS product_id,
        p.sku,
