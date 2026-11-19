@@ -167,6 +167,8 @@ def list_products():
                          'unit_name', u.name,
                          'factor_to_base', pu.factor_to_base,
                          'is_base', pu.is_base,
+                         'purchase_allowed', pu.is_purchase_allowed,
+                         'sale_allowed', pu.is_sale_allowed,
                          'sale_price', pup.sale_price,
                          'currency_code', pup.currency_code
                        ) ORDER BY pu.factor_to_base DESC
