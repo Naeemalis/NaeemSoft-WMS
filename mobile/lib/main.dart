@@ -681,7 +681,7 @@ class _ReceiptsPageState extends _RefreshableState<ReceiptsPage> {
   Future<void> _newReceipt() async {
     final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => NewReceiptDialog(api: widget.api),
+      builder: (_) => MultiReceiptDialog(api: widget.api),
     );
     if (saved == true) await reload();
   }
@@ -773,6 +773,49 @@ class _ReceiptsPageState extends _RefreshableState<ReceiptsPage> {
           ],
         ),
       );
+}
+
+
+class _MultiReceiptLine {
+  _MultiReceiptLine(this.product,this.unit):qty=TextEditingController(text:'1'),cost=TextEditingController(text:'0');
+  final Map<String,dynamic> product,unit;final TextEditingController qty,cost;
+  void dispose(){qty.dispose();cost.dispose();}
+}
+class MultiReceiptDialog extends StatefulWidget{
+  const MultiReceiptDialog({required this.api,super.key});final WmsApi api;
+  @override State<MultiReceiptDialog> createState()=>_MultiReceiptDialogState();
+}
+class _MultiReceiptDialogState extends State<MultiReceiptDialog>{
+  late Future<List<dynamic>> future;final number=TextEditingController(),currency=TextEditingController();
+  String? supplier;final lines=<_MultiReceiptLine>[];bool saving=false;
+  @override void initState(){super.initState();future=Future.wait([widget.api.get('/api/suppliers'),widget.api.get('/api/products')]);}
+  @override void dispose(){number.dispose();currency.dispose();for(final x in lines){x.dispose();}super.dispose();}
+  void add(Map<String,dynamic> p,Map<String,dynamic> u){setState(()=>lines.add(_MultiReceiptLine(p,u)));}
+  Future<void> save()async{
+    if(supplier==null||number.text.trim().isEmpty||lines.isEmpty)return;
+    final items=<Map<String,dynamic>>[];
+    for(final x in lines){final q=double.tryParse(x.qty.text),v=double.tryParse(x.cost.text);if(q==null||q<=0||v==null||v<0)return;items.add({'product_unit_id':x.unit['product_unit_id'],'quantity':q,'unit_cost':v});}
+    setState(()=>saving=true);
+    try{await widget.api.post('/api/receipts',{'supplier_id':supplier,'receipt_number':number.text.trim(),'currency_code':currency.text.trim().toUpperCase(),'items':items});if(mounted)Navigator.pop(context,true);}
+    catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));}
+    finally{if(mounted)setState(()=>saving=false);}
+  }
+  @override Widget build(BuildContext context)=>AlertDialog(title:const Text('كاشير استلام التوريد'),content:SizedBox(width:520,height:560,child:FutureBuilder<List<dynamic>>(future:future,builder:(ctx,s){
+    if(s.hasError)return ErrorPanel(message:s.error.toString());if(!s.hasData)return const LoadingPanel();
+    final suppliers=s.data![0] as List,products=s.data![1] as List;
+    return Column(children:[
+      TextField(controller:number,decoration:const InputDecoration(labelText:'رقم فاتورة المورد')),
+      DropdownButtonFormField<String>(initialValue:supplier,decoration:const InputDecoration(labelText:'المورد'),items:suppliers.map((x)=>DropdownMenuItem<String>(value:x['id'].toString(),child:Text(x['name'].toString()))).toList(),onChanged:(v)=>setState(()=>supplier=v)),
+      TextField(controller:currency,decoration:const InputDecoration(labelText:'رمز العملة')),
+      const Align(alignment:Alignment.centerRight,child:Text('معرض الأصناف — اضغط لإضافة الصنف')),
+      SizedBox(height:150,child:GridView.builder(gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,childAspectRatio:2.4),itemCount:products.length,itemBuilder:(ctx,i){final p=Map<String,dynamic>.from(products[i]);final units=(p['units'] as List? ?? []).where((u)=>u['purchase_allowed']!=false).toList();return Card(child:InkWell(onTap:units.isEmpty?null:()=>add(p,Map<String,dynamic>.from(units.first)),child:Center(child:Text(p['name'].toString(),textAlign:TextAlign.center))));})),
+      const Divider(),const Align(alignment:Alignment.centerRight,child:Text('تفاصيل الفاتورة')),
+      Expanded(child:ListView.builder(itemCount:lines.length,itemBuilder:(ctx,i){final x=lines[i];return Card(child:Padding(padding:const EdgeInsets.all(6),child:Column(children:[
+        Row(children:[Expanded(child:Text('${x.product['name']} — ${x.unit['unit_name']}')),IconButton(onPressed:()=>setState(()=>lines.removeAt(i).dispose()),icon:const Icon(Icons.delete_outline))]),
+        Row(children:[Expanded(child:TextField(controller:x.qty,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'الكمية'))),const SizedBox(width:8),Expanded(child:TextField(controller:x.cost,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'تكلفة الوحدة')))])
+      ])));}))
+    ]);
+  })),actions:[TextButton(onPressed:()=>Navigator.pop(context,false),child:const Text('إلغاء')),FilledButton(onPressed:saving?null:save,child:Text(saving?'حفظ...':'حفظ كمسودة'))]);
 }
 
 class NewReceiptDialog extends StatefulWidget {
