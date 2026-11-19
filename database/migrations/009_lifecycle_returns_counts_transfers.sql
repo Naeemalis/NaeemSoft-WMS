@@ -6,6 +6,9 @@ ALTER TABLE products
   ADD COLUMN IF NOT EXISTS reorder_level_base numeric(24,6) NOT NULL DEFAULT 0
   CHECK (reorder_level_base >= 0);
 
+-- Composite key used by return/transfer line foreign keys; batch id is already globally unique.
+ALTER TABLE batches ADD CONSTRAINT uq_batches_id_product UNIQUE (id, product_id);
+
 -- All lifecycle documents use the same branch/warehouse/product/user relationships.
 CREATE TABLE IF NOT EXISTS stock_returns (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
