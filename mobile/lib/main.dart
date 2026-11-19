@@ -777,9 +777,19 @@ class _ReceiptsPageState extends _RefreshableState<ReceiptsPage> {
 
 
 class _MultiReceiptLine {
-  _MultiReceiptLine(this.product,this.unit):qty=TextEditingController(text:'1'),cost=TextEditingController(text:'0');
-  final Map<String,dynamic> product,unit;final TextEditingController qty,cost;
-  void dispose(){qty.dispose();cost.dispose();}
+  _MultiReceiptLine(this.product, this.unit, this.purchaseUnits)
+      : qty = TextEditingController(text: '1'),
+        cost = TextEditingController(text: '0');
+
+  final Map<String, dynamic> product;
+  Map<String, dynamic> unit;
+  final List<Map<String, dynamic>> purchaseUnits;
+  final TextEditingController qty, cost;
+
+  void dispose() {
+    qty.dispose();
+    cost.dispose();
+  }
 }
 class MultiReceiptDialog extends StatefulWidget{
   const MultiReceiptDialog({required this.api,super.key});final WmsApi api;
@@ -790,7 +800,10 @@ class _MultiReceiptDialogState extends State<MultiReceiptDialog>{
   String? supplier;final lines=<_MultiReceiptLine>[];bool saving=false;
   @override void initState(){super.initState();future=Future.wait([widget.api.get('/api/suppliers'),widget.api.get('/api/products')]);}
   @override void dispose(){number.dispose();currency.dispose();for(final x in lines){x.dispose();}super.dispose();}
-  void add(Map<String,dynamic> p,Map<String,dynamic> u){setState(()=>lines.add(_MultiReceiptLine(p,u)));}
+  void add(Map<String, dynamic> p, Map<String, dynamic> u,
+      List<Map<String, dynamic>> purchaseUnits) {
+    setState(() => lines.add(_MultiReceiptLine(p, u, purchaseUnits)));
+  }
   Future<void> save()async{
     if(supplier==null||number.text.trim().isEmpty||lines.isEmpty)return;
     final items=<Map<String,dynamic>>[];
@@ -808,10 +821,27 @@ class _MultiReceiptDialogState extends State<MultiReceiptDialog>{
       DropdownButtonFormField<String>(initialValue:supplier,decoration:const InputDecoration(labelText:'المورد'),items:suppliers.map((x)=>DropdownMenuItem<String>(value:x['id'].toString(),child:Text(x['name'].toString()))).toList(),onChanged:(v)=>setState(()=>supplier=v)),
       TextField(controller:currency,decoration:const InputDecoration(labelText:'رمز العملة')),
       const Align(alignment:Alignment.centerRight,child:Text('معرض الأصناف — اضغط لإضافة الصنف')),
-      SizedBox(height:150,child:GridView.builder(gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,childAspectRatio:2.4),itemCount:products.length,itemBuilder:(ctx,i){final p=Map<String,dynamic>.from(products[i]);final units=(p['units'] as List? ?? []).where((u)=>u['purchase_allowed']!=false).toList();return Card(child:InkWell(onTap:units.isEmpty?null:()=>add(p,Map<String,dynamic>.from(units.first)),child:Center(child:Text(p['name'].toString(),textAlign:TextAlign.center))));})),
+      SizedBox(height:150,child:GridView.builder(gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,childAspectRatio:2.4),itemCount:products.length,itemBuilder:(ctx,i){final p=Map<String,dynamic>.from(products[i]);final units=(p['units'] as List? ?? []).where((u)=>u['purchase_allowed']!=false).toList();return Card(child:InkWell(onTap:units.isEmpty?null:()=>add(p,Map<String,dynamic>.from(units.first),units.map((u)=>Map<String,dynamic>.from(u)).toList()),child:Center(child:Text(p['name'].toString(),textAlign:TextAlign.center))));})),
       const Divider(),const Align(alignment:Alignment.centerRight,child:Text('تفاصيل الفاتورة')),
       Expanded(child:ListView.builder(itemCount:lines.length,itemBuilder:(ctx,i){final x=lines[i];return Card(child:Padding(padding:const EdgeInsets.all(6),child:Column(children:[
-        Row(children:[Expanded(child:Text('${x.product['name']} — ${x.unit['unit_name']}')),IconButton(onPressed:()=>setState(()=>lines.removeAt(i).dispose()),icon:const Icon(Icons.delete_outline))]),
+        Row(children:[
+          Expanded(child:Text(x.product['name'].toString(),style:const TextStyle(fontWeight:FontWeight.w600))),
+          IconButton(onPressed:()=>setState(()=>lines.removeAt(i).dispose()),icon:const Icon(Icons.delete_outline))
+        ]),
+        DropdownButtonFormField<String>(
+          initialValue:x.unit['product_unit_id'].toString(),
+          decoration:const InputDecoration(labelText:'وحدة الشراء'),
+          items:x.purchaseUnits.map((u)=>DropdownMenuItem<String>(
+            value:u['product_unit_id'].toString(),
+            child:Text(u['unit_name'].toString())
+          )).toList(),
+          onChanged:(value){
+            if(value==null)return;
+            setState(()=>x.unit=x.purchaseUnits.firstWhere(
+              (u)=>u['product_unit_id'].toString()==value
+            ));
+          },
+        ),
         Row(children:[Expanded(child:TextField(controller:x.qty,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'الكمية'))),const SizedBox(width:8),Expanded(child:TextField(controller:x.cost,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'تكلفة الوحدة')))])
       ])));}))
     ]);
