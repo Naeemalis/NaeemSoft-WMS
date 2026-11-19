@@ -41,3 +41,10 @@ A push changing `mobile/**` starts the **Build NaeemSoft-WMS Android APK** workf
 The first integration milestone still uses a shared private service API key and a system actor. It is for a trusted development/private network only. Before public or production exposure, implement per-user authentication, branch-scoped authorization, TLS and permission checks for approval and payment actions.
 
 The current statement model records supplier receipts/payments and approved recipient issues/collections. Supplier and recipient return workflows, minimum-stock thresholds, stock counts, transfers, full role/permission UI and valuation (FIFO vs weighted average) still require subsequent implementation. The valuation method has not been selected.
+
+
+## Product lifecycle traceability
+
+- Product movement history API: `GET /api/products/{product_id}/movements` returns the append-only stock ledger with batch, warehouse, source document and actor references.
+- Per-product reorder level API: `PATCH /api/products/{product_id}/reorder-level`; alerts are available from `GET /api/stock/reorder-alerts`.
+- Migration 009 adds relational structures for return, count and transfer documents. These document workflows are schema groundwork only; posting/approval APIs and Android screens are still pending.
