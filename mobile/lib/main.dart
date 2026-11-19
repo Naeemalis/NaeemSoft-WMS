@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'document_print.dart';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:http/http.dart' as http;
@@ -738,6 +739,19 @@ class _ReceiptsPageState extends _RefreshableState<ReceiptsPage> {
                             Text('فاتورة ${row['receipt_number']}', style: const TextStyle(fontWeight: FontWeight.bold)),
                             const SizedBox(height: 4),
                             Text('${row['supplier_name']} • ${row['receipt_date']}'),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: OutlinedButton.icon(
+                                onPressed: () => openDocumentPrint(
+                                  context,
+                                  loadDocument: () => widget.api.get('/api/receipts/$id'),
+                                  fileName: 'receipt-${row['receipt_number']}.pdf',
+                                  pageTitle: 'فاتورة توريد',
+                                ),
+                                icon: const Icon(Icons.print_outlined),
+                                label: const Text('معاينة / طباعة / مشاركة'),
+                              ),
+                            ),
                             const SizedBox(height: 6),
                             Row(
                               children: [
@@ -998,7 +1012,14 @@ class _IssuesPageState extends _RefreshableState<IssuesPage>{
     return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
       Row(children:[const Expanded(child:Text('كاشير الصرف بالجملة',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold))),IconButton(onPressed:addRecipient,icon:const Icon(Icons.person_add)),FilledButton(onPressed:newIssue,child:const Text('صرف جديد'))]),
       Text('الأصناف المتاحة فقط: ${available.map((x)=>x['product_id']).toSet().length}'),
-      ...issues.map((x){final id=x['id'].toString(),st=x['status'].toString();return Card(child:ListTile(title:Text('${x['issue_number']} — ${x['recipient_name']}'),subtitle:Text('${x['issue_date']} • ${x['total']} ${x['currency_code']} • $st'),trailing:st=='draft'?TextButton(onPressed:()=>action(id,'submit'),child:const Text('إرسال للاعتماد')):st=='pending_approval'?FilledButton(onPressed:()=>action(id,'approve'),child:const Text('اعتماد التسليم')):const Icon(Icons.check_circle)));})
+      ...issues.map((x){final id=x['id'].toString(),st=x['status'].toString();return Card(child:Column(children:[
+        ListTile(title:Text('${x['issue_number']} — ${x['recipient_name']}'),subtitle:Text('${x['issue_date']} • ${x['total']} ${x['currency_code']} • $st'),trailing:st=='draft'?TextButton(onPressed:()=>action(id,'submit'),child:const Text('إرسال للاعتماد')):st=='pending_approval'?FilledButton(onPressed:()=>action(id,'approve'),child:const Text('اعتماد التسليم')):const Icon(Icons.check_circle)),
+        Align(alignment:Alignment.centerLeft,child:TextButton.icon(
+          onPressed:()=>openDocumentPrint(context,
+            loadDocument:()=>widget.api.get('/api/issues/$id/document'),
+            fileName:'issue-${x['issue_number']}.pdf',pageTitle:'مستند صرف'),
+          icon:const Icon(Icons.print_outlined),label:const Text('معاينة / طباعة / مشاركة'))),
+      ]));})
     ]);
   }));
 }
