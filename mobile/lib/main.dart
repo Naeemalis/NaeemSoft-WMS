@@ -990,6 +990,7 @@ class _IssueEntryDialogState extends State<IssueEntryDialog>{
     ]);
   })),actions:[TextButton(onPressed:()=>Navigator.pop(context,false),child:const Text('إلغاء')),FilledButton(onPressed:saving?null:save,child:Text(saving?'حفظ...':'حفظ كمسودة'))]);
 }
+
 class AccountsPage extends StatefulWidget{const AccountsPage({required this.api,super.key});final WmsApi api;@override State<AccountsPage> createState()=>_AccountsPageState();}
 class _AccountsPageState extends State<AccountsPage>{
   bool supplier=true;String? party;late Future<dynamic> parties;Future<dynamic>? statement;
@@ -997,13 +998,40 @@ class _AccountsPageState extends State<AccountsPage>{
   void load(){parties=widget.api.get(supplier?'/api/suppliers':'/api/recipients');party=null;statement=null;}
   void switchType(bool v){setState((){supplier=v;load();});}
   void choose(String? id){setState((){party=id;statement=id==null?null:widget.api.get(supplier?'/api/suppliers/$id/statement':'/api/recipients/$id/statement');});}
+  Future<void> addPayment()async{
+    if(party==null)return;
+    final no=TextEditingController(),amount=TextEditingController(),currency=TextEditingController();
+    final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
+      title:Text(supplier?'تسجيل سداد المورد':'تسجيل تحصيل من المستلم'),
+      content:Column(mainAxisSize:MainAxisSize.min,children:[
+        TextField(controller:no,decoration:const InputDecoration(labelText:'رقم السند')),
+        TextField(controller:amount,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'المبلغ')),
+        TextField(controller:currency,decoration:const InputDecoration(labelText:'رمز العملة')),
+      ]),
+      actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),
+        FilledButton(onPressed:()async{
+          final v=double.tryParse(amount.text);if(no.text.trim().isEmpty||v==null||v<=0)return;
+          try{await widget.api.post(supplier?'/api/suppliers/$party/payments':'/api/recipients/$party/payments',{'payment_number':no.text.trim(),'amount':v,'currency_code':currency.text.trim().toUpperCase()});if(ctx.mounted)Navigator.pop(ctx,true);}
+          catch(e){if(ctx.mounted)ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content:Text(e.toString())));}
+        },child:const Text('تسجيل'))]));
+    no.dispose();amount.dispose();currency.dispose();
+    if(ok==true&&mounted)choose(party);
+  }
   @override Widget build(BuildContext context)=>PageFrame(child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
     const Text('كشوف الحساب',style:TextStyle(fontSize:21,fontWeight:FontWeight.bold)),
-    SegmentedButton<bool>(segments:const [ButtonSegment(value:true,label:Text('المورد')),ButtonSegment(value:false,label:Text('المستلم'))],selected:{supplier},onSelectionChanged:(v)=>switchType(v.first)),
+    SegmentedButton<bool>(segments:const [ButtonSegment(value:true,label:Text('كشف المورد')),ButtonSegment(value:false,label:Text('كشف المستلم'))],selected:{supplier},onSelectionChanged:(v)=>switchType(v.first)),
     FutureBuilder<dynamic>(future:parties,builder:(ctx,s){if(s.hasError)return ErrorPanel(message:s.error.toString());if(!s.hasData)return const LoadingPanel();return DropdownButtonFormField<String>(initialValue:party,decoration:const InputDecoration(labelText:'اختر الحساب'),items:(s.data as List).map((x)=>DropdownMenuItem<String>(value:x['id'].toString(),child:Text(x['name'].toString()))).toList(),onChanged:choose);}),
-    if(statement!=null)FutureBuilder<dynamic>(future:statement,builder:(ctx,s){if(s.hasError)return ErrorPanel(message:s.error.toString());if(!s.hasData)return const LoadingPanel();final rows=s.data['entries'] as List;return Column(children:rows.map((x)=>Card(child:ListTile(title:Text('${x['description']} — ${x['document_number']}'),subtitle:Text('${x['entry_date']} • ${x['currency_code']}'),trailing:Column(mainAxisAlignment:MainAxisAlignment.center,crossAxisAlignment:CrossAxisAlignment.end,children:[Text('مدين ${x['debit']}'),Text('دائن ${x['credit']}'),Text('الرصيد ${x['running_balance']}',style:const TextStyle(fontWeight:FontWeight.bold))])))).toList());})
+    if(party!=null)Align(alignment:Alignment.centerLeft,child:OutlinedButton.icon(onPressed:addPayment,icon:const Icon(Icons.payments_outlined),label:Text(supplier?'سداد المورد':'تحصيل من المستلم'))),
+    if(statement!=null)FutureBuilder<dynamic>(future:statement,builder:(ctx,s){if(s.hasError)return ErrorPanel(message:s.error.toString());if(!s.hasData)return const LoadingPanel();final rows=s.data['entries'] as List;return Column(children:rows.isEmpty?[const EmptyPanel(message:'لا توجد حركات حساب مسجلة.')]:rows.map((x)=>Card(child:ListTile(
+      title:Text('${x['description']} — ${x['document_number']}'),
+      subtitle:Text('${x['entry_date']} • ${x['currency_code']}'),
+      trailing:Column(mainAxisAlignment:MainAxisAlignment.center,crossAxisAlignment:CrossAxisAlignment.end,children:[
+        Text('مدين ${x['debit']}'),Text('دائن ${x['credit']}'),
+        Text('الرصيد ${x['running_balance']}',style:const TextStyle(fontWeight:FontWeight.bold))
+      ])))).toList());})
   ]));
 }
+
 class AvailabilityPage extends StatefulWidget{const AvailabilityPage({required this.api,super.key});final WmsApi api;@override State<AvailabilityPage> createState()=>_AvailabilityPageState();}
 class _AvailabilityPageState extends _RefreshableState<AvailabilityPage>{
   late Future<List<dynamic>> future;@override void initState(){super.initState();future=Future.wait([widget.api.get('/api/stock'),widget.api.get('/api/stock/expiry-alerts')]);}
