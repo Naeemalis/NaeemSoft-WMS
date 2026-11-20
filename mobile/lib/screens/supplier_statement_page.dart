@@ -96,7 +96,6 @@ class _SupplierStatementPageState extends State<SupplierStatementPage> {
 
   @override
   Widget build(BuildContext context) {
-    final supplier = _suppliers.where((e)=>e['id']==_supplierId).firstOrNull;
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed:_supplierId==null?null:_recordPayment,
@@ -115,7 +114,7 @@ class _SupplierStatementPageState extends State<SupplierStatementPage> {
             Wrap(spacing:8, runSpacing:8, children:[
               OutlinedButton.icon(onPressed:()=>_pickDate(true), icon:const Icon(Icons.calendar_today), label:Text('من: ${_date(_from)}')),
               OutlinedButton.icon(onPressed:()=>_pickDate(false), icon:const Icon(Icons.event), label:Text('إلى: ${_date(_to)}')),
-              TextButton(onPressed:() async {setState(()=>{_from=null,_to=null}); await _loadStatement();}, child:const Text('كل الفترة')),
+              TextButton(onPressed:() async { setState(() { _from=null; _to=null; }); await _loadStatement(); }, child:const Text('كل الفترة')),
             ]),
             const SizedBox(height:10),
             _balanceCard('الرصيد السابق',_balances['opening']??0),
