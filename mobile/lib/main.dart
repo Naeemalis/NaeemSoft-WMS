@@ -282,6 +282,10 @@ const Map<String, Map<String, String>> _strings = {
     'saveDraft':'حفظ المسودة','approveDocument':'اعتماد المستند','cancelDraft':'إلغاء المسودة',
     'addSupplierFirst':'أضف مورداً قبل تنفيذ الاستلام','addRecipientFirst':'أضف مستلماً قبل تنفيذ الصرف',
     'refresh':'تحديث',
+    'addProduct':'إضافة صنف','productName':'اسم الصنف','baseUnit':'وحدة الأساس',
+    'minimumStock':'حد إعادة الطلب','save':'حفظ','cancel':'إلغاء','addPartner':'إضافة جهة',
+    'name':'الاسم','phone':'الهاتف','address':'العنوان','noPartners':'لا توجد جهات مسجلة',
+    'approvedReceipts':'الاستلامات المعتمدة','approvedIssues':'عمليات الصرف المعتمدة','stockMovements':'حركات المخزون',
   },
   'en': {
     'dashboard':'Dashboard','products':'Products','receiving':'Receiving cashier','issuing':'Issue cashier',
@@ -299,6 +303,10 @@ const Map<String, Map<String, String>> _strings = {
     'saveDraft':'Save draft','approveDocument':'Approve document','cancelDraft':'Cancel draft',
     'addSupplierFirst':'Add a supplier before receiving stock','addRecipientFirst':'Add a recipient before issuing stock',
     'refresh':'Refresh',
+    'addProduct':'Add product','productName':'Product name','baseUnit':'Base unit',
+    'minimumStock':'Minimum stock','save':'Save','cancel':'Cancel','addPartner':'Add contact',
+    'name':'Name','phone':'Phone','address':'Address','noPartners':'No contacts registered',
+    'approvedReceipts':'Approved receipts','approvedIssues':'Approved issues','stockMovements':'Stock movements',
   },
   'fr': {
     'dashboard':'Tableau de bord','products':'Articles','receiving':'Caisse de réception','issuing':'Caisse de sortie',
@@ -316,5 +324,9 @@ const Map<String, Map<String, String>> _strings = {
     'saveDraft':'Enregistrer le brouillon','approveDocument':'Valider le document','cancelDraft':'Annuler le brouillon',
     'addSupplierFirst':'Ajoutez un fournisseur avant la réception','addRecipientFirst':'Ajoutez un destinataire avant la sortie',
     'refresh':'Actualiser',
+    'addProduct':'Ajouter un article','productName':'Nom de l’article','baseUnit':'Unité de base',
+    'minimumStock':'Stock minimum','save':'Enregistrer','cancel':'Annuler','addPartner':'Ajouter un contact',
+    'name':'Nom','phone':'Téléphone','address':'Adresse','noPartners':'Aucun contact enregistré',
+    'approvedReceipts':'Réceptions validées','approvedIssues':'Sorties validées','stockMovements':'Mouvements de stock',
   },
 };
