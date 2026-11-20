@@ -12,7 +12,8 @@ import 'package:naeemsoft_wms/screens/cashier_page.dart';
 
 Future<void> _pumpDatabase(WidgetTester tester) async {
   await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
-  await tester.pumpAndSettle();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
 }
 
 void main() {
