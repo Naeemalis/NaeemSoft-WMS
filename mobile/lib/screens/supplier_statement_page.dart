@@ -71,13 +71,18 @@ class _SupplierStatementPageState extends State<SupplierStatementPage> {
     ));
     if(ok==true) {
       try {
-        final value=double.parse(amount.text.trim());
+        final value=double.tryParse(amount.text.trim());
+        if(value==null || !value.isFinite || value<=0) {
+          throw ArgumentError('يجب إدخال مبلغ صحيح أكبر من صفر.');
+        }
         final db=await LocalDatabase.instance.database;
         await SupplierAccountOperations(db).recordPayment(
           number:'SP-${DateTime.now().millisecondsSinceEpoch}', supplierId:id,
           date:DateTime.now(), amount:value, method:method,
           reference:reference.text.trim().isEmpty?null:reference.text.trim());
         await _loadStatement();
+        if(mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content:Text('تم تسجيل الدفعة وتحديث كشف الحساب.')));
       } catch(e) {
         if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تسجيل الدفعة: $e')));
       }
@@ -90,6 +95,13 @@ class _SupplierStatementPageState extends State<SupplierStatementPage> {
     final picked=await showDatePicker(context:context, initialDate:initial,
       firstDate:DateTime(2000), lastDate:DateTime(2100));
     if(picked==null) return;
+    final candidateFrom = start ? picked : _from;
+    final candidateTo = start ? _to : picked;
+    if(candidateFrom!=null && candidateTo!=null && candidateFrom.isAfter(candidateTo)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content:Text('تاريخ البداية يجب أن يسبق تاريخ النهاية أو يساويه.')));
+      return;
+    }
     setState(()=> start ? _from=picked : _to=picked);
     await _loadStatement();
   }
