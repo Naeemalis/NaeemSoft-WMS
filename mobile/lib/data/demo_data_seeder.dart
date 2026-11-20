@@ -90,11 +90,11 @@ class DemoDataSeeder {
         await txn.rawUpdate('UPDATE receipts SET total_cost = total_cost + ? WHERE id = ?',
           [lineCost,receiptId]);
       }
-      await addReceiptLine(receipt1,pen,pcs,100,1,1.5);
-      await addReceiptLine(receipt1,sugar,kg,50,1,2.0);
-      await addReceiptLine(receipt1,oil,litre,40,1,3.0);
-      await addReceiptLine(receipt2,notebook,pcs,60,1,2.5);
-      await addReceiptLine(receipt2,soap,pcs,80,1,1.0);
+      await addReceiptLine(receipt1,products['pen']!,pcs,100,1,1.5);
+      await addReceiptLine(receipt1,products['sugar']!,kg,50,1,2.0);
+      await addReceiptLine(receipt1,products['oil']!,litre,40,1,3.0);
+      await addReceiptLine(receipt2,products['notebook']!,pcs,60,1,2.5);
+      await addReceiptLine(receipt2,products['soap']!,pcs,80,1,1.0);
 
       // Approval is performed after the seed transaction commits, using the
       // same InventoryOperations path as live cashier receipts.
