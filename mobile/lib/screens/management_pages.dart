@@ -180,7 +180,20 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _products.isEmpty
-              ? Center(child: Text(widget.tr('noProducts')))
+              ? Center(child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.inventory_2_outlined, size: 44),
+                    const SizedBox(height: 10),
+                    Text(widget.tr('noProducts')),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: _units.isEmpty ? null : _addProduct,
+                      icon: const Icon(Icons.add),
+                      label: Text(widget.tr('addProduct')),
+                    ),
+                  ]),
+                ))
               : GridView.builder(
                   padding: const EdgeInsets.all(16),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -377,7 +390,20 @@ class _PartnerManagementPageState extends State<PartnerManagementPage> {
     body: _loading
         ? const Center(child: CircularProgressIndicator())
         : _items.isEmpty
-            ? Center(child: Text(widget.tr('noPartners')))
+            ? Center(child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(widget.suppliers ? Icons.local_shipping_outlined : Icons.people_alt_outlined, size: 44),
+                  const SizedBox(height: 10),
+                  Text(widget.tr('noPartners')),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: _add,
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: Text(widget.tr('addPartner')),
+                  ),
+                ]),
+              ))
             : ListView.separated(
                 padding: const EdgeInsets.all(12),
                 itemCount: _items.length,
