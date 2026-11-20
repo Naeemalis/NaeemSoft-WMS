@@ -4,9 +4,10 @@ import 'package:sqflite/sqflite.dart';
 import '../data/local_database.dart';
 
 class ProductManagementPage extends StatefulWidget {
-  const ProductManagementPage({required this.tr, this.autoOpenAdd = false, super.key});
+  const ProductManagementPage({required this.tr, this.autoOpenAdd = false, this.onDone, super.key});
   final String Function(String) tr;
   final bool autoOpenAdd;
+  final VoidCallback? onDone;
 
   @override
   State<ProductManagementPage> createState() => _ProductManagementPageState();
@@ -106,9 +107,10 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         });
       });
       await _load();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تمت إضافة الصنف بنجاح.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إضافة الصنف بنجاح.')));
+        widget.onDone?.call();
+      }
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تعذرت إضافة الصنف: $error')),
@@ -236,10 +238,11 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
 }
 
 class PartnerManagementPage extends StatefulWidget {
-  const PartnerManagementPage({required this.tr, required this.suppliers, this.autoOpenAdd = false, super.key});
+  const PartnerManagementPage({required this.tr, required this.suppliers, this.autoOpenAdd = false, this.onDone, super.key});
   final String Function(String) tr;
   final bool suppliers;
   final bool autoOpenAdd;
+  final VoidCallback? onDone;
 
   @override
   State<PartnerManagementPage> createState() => _PartnerManagementPageState();
@@ -308,9 +311,10 @@ class _PartnerManagementPageState extends State<PartnerManagementPage> {
         'address': address.text.trim().isEmpty ? null : address.text.trim(),
       });
       await _load();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.suppliers ? 'تمت إضافة المورد بنجاح.' : 'تمت إضافة المستلم بنجاح.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.suppliers ? 'تمت إضافة المورد بنجاح.' : 'تمت إضافة المستلم بنجاح.')));
+        widget.onDone?.call();
+      }
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تعذرت إضافة الجهة: $error')),
