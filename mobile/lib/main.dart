@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'data/local_database.dart';
+import 'screens/cashier_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -270,56 +271,6 @@ class ProductsPage extends StatelessWidget {
           ]),
         );
       },
-    );
-  }
-}
-
-class CashierPage extends StatelessWidget {
-  const CashierPage({required this.tr, required this.receiving, super.key});
-  final String Function(String) tr;
-  final bool receiving;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(tr(receiving ? 'receiving' : 'issuing'), style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        Text(tr(receiving ? 'receivingRule' : 'issuingRule')),
-        const SizedBox(height: 14),
-        Expanded(child: FutureBuilder<List<Map<String, Object?>>>(
-          future: LocalDatabase.instance.getProducts(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) return Center(child: Text(snapshot.error.toString()));
-            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-            final products = snapshot.data!;
-            final eligible = receiving ? products : products.where((p) => ((p['available_quantity'] as num?) ?? 0) > 0).toList();
-            if (eligible.isEmpty) return Center(child: Text(tr(receiving ? 'noProducts' : 'noAvailableProducts')));
-            final width = MediaQuery.sizeOf(context).width;
-            final columns = width < 420 ? 2 : width < 720 ? 3 : width < 1050 ? 4 : 6;
-            return GridView.builder(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.3),
-              itemCount: eligible.length,
-              itemBuilder: (context, index) {
-                final product = eligible[index];
-                return Card(child: InkWell(
-                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('cashierFoundation')))),
-                  child: Center(child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      const Icon(Icons.inventory_2_outlined, size: 26),
-                      const SizedBox(height: 6),
-                      Text((product['name_ar'] ?? '').toString(), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      Text('${product['available_quantity'] ?? 0} ${product['base_unit_name'] ?? ''}', style: Theme.of(context).textTheme.bodySmall),
-                    ]),
-                  )),
-                ));
-              },
-            );
-          },
-        )),
-      ]),
     );
   }
 }
