@@ -396,6 +396,51 @@ void main() {
     expect(Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM products WHERE sku LIKE 'DEMO-%'")), 5);
   });
 
+
+  test('stocktake freeze blocks issue approval and preserves the issue draft', () async {
+    final receiptId = await operations.createReceipt(
+      number: 'R-FREEZE-ISSUE',
+      supplierId: supplierId,
+      receiptDate: DateTime(2026, 11, 20),
+      lines: [
+        ReceiptLineInput(
+          productId: productId,
+          unitId: unitId,
+          quantity: 8,
+          factorToBase: 1,
+          unitCost: 2,
+        ),
+      ],
+    );
+    await operations.approveReceipt(receiptId);
+    final issueId = await operations.createIssue(
+      number: 'I-FROZEN',
+      recipientId: recipientId,
+      issueDate: DateTime(2026, 11, 20),
+      lines: [
+        IssueLineInput(
+          productId: productId,
+          unitId: unitId,
+          quantity: 2,
+          factorToBase: 1,
+          unitPrice: 4,
+        ),
+      ],
+    );
+    await db.insert('stock_counts', {
+      'count_number': 'SC-ISSUE-001',
+      'status': 'in_progress',
+      'started_at': DateTime(2026, 11, 20).toIso8601String(),
+    });
+
+    await expectLater(operations.approveIssue(issueId), throwsA(anything));
+    expect((await db.query('inventory_batches')).single['remaining_quantity_base'], 8);
+    expect((await db.query('issues')).single['status'], 'draft');
+    expect(Sqflite.firstIntValue(await db.rawQuery(
+      "SELECT COUNT(*) FROM stock_movements WHERE direction = 'OUT'",
+    )), 0);
+  });
+
   test('stocktake freeze blocks receipt approval', () async {
     final receiptId = await operations.createReceipt(
       number: 'R-004',
