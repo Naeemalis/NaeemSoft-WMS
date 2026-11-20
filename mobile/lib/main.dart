@@ -3,6 +3,7 @@ import 'data/local_database.dart';
 import 'screens/cashier_page.dart';
 import 'screens/management_pages.dart';
 import 'screens/supplier_statement_page.dart';
+import 'data/demo_data_seeder.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -231,30 +232,81 @@ class DashboardPage extends StatelessWidget {
   }
 }
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({required this.locale, required this.onChanged, required this.tr, super.key});
   final Locale locale;
   final ValueChanged<Locale> onChanged;
   final String Function(String) tr;
 
   @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  bool _seeding = false;
+
+  Future<void> _loadDemoData() async {
+    if (_seeding) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تحميل بيانات تجريبية'),
+        content: const Text('سيضيف النظام 5 أصناف وموردين اثنين وجهتي استلام، وينشئ فاتورتي توريد وسندي صرف معتمدين لتجربة سير العمل. لا تحذف هذه البيانات تلقائياً.'),
+        actions: [
+          TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),
+          FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تحميل')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(()=>_seeding=true);
+    try {
+      final db=await LocalDatabase.instance.database;
+      final result=await DemoDataSeeder(db).seed();
+      if (!mounted) return;
+      final already=result['alreadySeeded']==1;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content:Text(already
+          ? 'البيانات التجريبية موجودة مسبقاً.'
+          : 'تم إنشاء 5 أصناف، وموردين، وجهتي استلام، وفاتورتي توريد وسندي صرف معتمدين.'),
+        duration:const Duration(seconds:5),
+      ));
+    } catch(e) {
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('تعذر تحميل البيانات التجريبية: $e')));
+    } finally {
+      if(mounted) setState(()=>_seeding=false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [
-    Text(tr('settings'), style: Theme.of(context).textTheme.headlineSmall),
+    Text(widget.tr('settings'), style: Theme.of(context).textTheme.headlineSmall),
     const SizedBox(height: 14),
     DropdownButtonFormField<String>(
-      value: locale.languageCode,
-      decoration: InputDecoration(labelText: tr('language')),
+      initialValue: widget.locale.languageCode,
+      decoration: InputDecoration(labelText: widget.tr('language')),
       items: const [
         DropdownMenuItem(value: 'ar', child: Text('العربية')),
         DropdownMenuItem(value: 'en', child: Text('English')),
         DropdownMenuItem(value: 'fr', child: Text('Français')),
       ],
-      onChanged: (value) { if (value != null) onChanged(Locale(value)); },
+      onChanged: (value) { if (value != null) widget.onChanged(Locale(value)); },
     ),
     const SizedBox(height: 18),
-    ListTile(leading: const Icon(Icons.storage_outlined), title: Text(tr('localDb')), subtitle: const Text('SQLite • App-private storage')),
-    ListTile(leading: const Icon(Icons.wifi_off), title: Text(tr('offlineOnly'))),
-    ListTile(leading: const Icon(Icons.phone_android), title: Text(tr('responsive'))),
+    ListTile(leading: const Icon(Icons.storage_outlined), title: Text(widget.tr('localDb')), subtitle: const Text('SQLite • App-private storage')),
+    ListTile(leading: const Icon(Icons.wifi_off), title: Text(widget.tr('offlineOnly'))),
+    ListTile(leading: const Icon(Icons.phone_android), title: Text(widget.tr('responsive'))),
+    const Divider(height:28),
+    Text('بيانات واختبارات التشغيل',style:Theme.of(context).textTheme.titleMedium),
+    const SizedBox(height:8),
+    FilledButton.icon(
+      onPressed:_seeding?null:_loadDemoData,
+      icon:_seeding?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.science_outlined),
+      label:Text(_seeding?'جارٍ إنشاء البيانات...':'إضافة بيانات تجريبية وتشغيل دورتين'),
+    ),
+    const SizedBox(height:6),
+    const Text('المنتجات التجريبية تشمل القلم والدفتر بالقطعة، السكر بالكيلو والجرام، وزيت الطبخ باللتر.'),
   ]);
 }
 
