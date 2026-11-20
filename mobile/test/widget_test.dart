@@ -73,6 +73,7 @@ void main() {
     expect(partnerAction, isTrue);
 
     await db.insert('suppliers', {'name': 'Supplier for product action'});
+    await db.delete('product_units');
     await db.delete('products');
     var productAction = false;
     await tester.pumpWidget(MaterialApp(
