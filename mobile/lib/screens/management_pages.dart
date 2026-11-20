@@ -101,6 +101,57 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     minimum.dispose();
   }
 
+  Future<void> _editProduct(Map<String, Object?> product) async {
+    final name = TextEditingController(text: (product['name_ar'] ?? '').toString());
+    final minimum = TextEditingController(text: ((product['minimum_stock'] as num?) ?? 0).toString());
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('تعديل بيانات الصنف'),
+          content: SizedBox(
+            width: 420,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(controller: name, decoration: InputDecoration(labelText: widget.tr('productName'))),
+              const SizedBox(height: 10),
+              TextField(controller: minimum,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(labelText: widget.tr('minimumStock'))),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(widget.tr('cancel'))),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(widget.tr('save'))),
+          ],
+        ),
+      );
+      if (result != true || !mounted) return;
+      final min = double.tryParse(minimum.text.trim());
+      if (name.text.trim().isEmpty || min == null || !min.isFinite || min < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل اسم الصنف وحد إعادة طلب صحيحاً.')));
+        return;
+      }
+      final db = await LocalDatabase.instance.database;
+      await db.update('products', {
+        'name_ar': name.text.trim(),
+        'name_en': name.text.trim(),
+        'name_fr': name.text.trim(),
+        'minimum_stock': min,
+      }, where: 'id = ?', whereArgs: [product['id']]);
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تحديث بيانات الصنف.')),
+      );
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تحديث الصنف: $error')),
+      );
+    } finally {
+      name.dispose();
+      minimum.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
@@ -130,7 +181,10 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     final minimum = (product['minimum_stock'] as num?)?.toDouble() ?? 0;
                     final color = quantity <= 0 ? Colors.red : quantity <= minimum && minimum > 0 ? Colors.orange : Colors.green;
                     return Card(
-                      child: Padding(
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => _editProduct(product),
+                        child: Padding(
                         padding: const EdgeInsets.all(10),
                         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                           Icon(Icons.inventory_2_outlined, color: color, size: 28),
@@ -141,6 +195,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                           const SizedBox(height: 6),
                           Text('${quantity.toStringAsFixed(quantity % 1 == 0 ? 0 : 2)} ${product['base_unit_name'] ?? ''}'),
                         ]),
+                      ),
                       ),
                     );
                   },
