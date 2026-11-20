@@ -427,6 +427,58 @@ class LocalDatabase {
       'CREATE INDEX IF NOT EXISTS idx_reservations_product_status ON stock_reservations(product_id, status)',
       'CREATE INDEX IF NOT EXISTS idx_payments_supplier_date ON payments(supplier_id, payment_date)',
       'CREATE INDEX IF NOT EXISTS idx_payments_recipient_date ON payments(recipient_id, payment_date)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_stock_freeze ON stock_freezes((1)) WHERE ended_at IS NULL',
+      '''CREATE TRIGGER IF NOT EXISTS trg_stock_count_freeze_on_create
+      AFTER INSERT ON stock_counts
+      BEGIN
+        SELECT CASE WHEN EXISTS (SELECT 1 FROM stock_freezes WHERE ended_at IS NULL)
+          THEN RAISE(ABORT, 'A stock count or maintenance freeze is already active') END;
+        INSERT INTO stock_freezes(reason_type, reason_id, started_by)
+        VALUES ('stock_count', NEW.id, NEW.created_by);
+      END''',
+      '''CREATE TRIGGER IF NOT EXISTS trg_stock_count_unfreeze_on_close
+      AFTER UPDATE OF status ON stock_counts
+      WHEN NEW.status IN ('approved','cancelled') AND OLD.status NOT IN ('approved','cancelled')
+      BEGIN
+        UPDATE stock_freezes
+        SET ended_at = CURRENT_TIMESTAMP, ended_by = NEW.approved_by
+        WHERE reason_type = 'stock_count' AND reason_id = NEW.id AND ended_at IS NULL;
+      END''',
+      '''CREATE TRIGGER IF NOT EXISTS trg_block_receipt_approval_during_freeze
+      BEFORE UPDATE OF status ON receipts
+      WHEN NEW.status = 'approved' AND OLD.status <> 'approved'
+        AND EXISTS (SELECT 1 FROM stock_freezes WHERE ended_at IS NULL)
+      BEGIN
+        SELECT RAISE(ABORT, 'Stock is frozen while a stock count or maintenance is active');
+      END''',
+      '''CREATE TRIGGER IF NOT EXISTS trg_block_issue_approval_during_freeze
+      BEFORE UPDATE OF status ON issues
+      WHEN NEW.status = 'approved' AND OLD.status <> 'approved'
+        AND EXISTS (SELECT 1 FROM stock_freezes WHERE ended_at IS NULL)
+      BEGIN
+        SELECT RAISE(ABORT, 'Stock is frozen while a stock count or maintenance is active');
+      END''',
+      '''CREATE TRIGGER IF NOT EXISTS trg_block_supplier_return_during_freeze
+      BEFORE UPDATE OF status ON supplier_returns
+      WHEN NEW.status = 'approved' AND OLD.status <> 'approved'
+        AND EXISTS (SELECT 1 FROM stock_freezes WHERE ended_at IS NULL)
+      BEGIN
+        SELECT RAISE(ABORT, 'Stock is frozen while a stock count or maintenance is active');
+      END''',
+      '''CREATE TRIGGER IF NOT EXISTS trg_block_customer_return_during_freeze
+      BEFORE UPDATE OF status ON customer_returns
+      WHEN NEW.status = 'approved' AND OLD.status <> 'approved'
+        AND EXISTS (SELECT 1 FROM stock_freezes WHERE ended_at IS NULL)
+      BEGIN
+        SELECT RAISE(ABORT, 'Stock is frozen while a stock count or maintenance is active');
+      END''',
+      '''CREATE TRIGGER IF NOT EXISTS trg_block_non_count_movement_during_freeze
+      BEFORE INSERT ON stock_movements
+      WHEN EXISTS (SELECT 1 FROM stock_freezes WHERE ended_at IS NULL)
+        AND NEW.movement_type <> 'count_adjustment'
+      BEGIN
+        SELECT RAISE(ABORT, 'Stock movements are blocked during stocktaking');
+      END''',
       '''CREATE TRIGGER IF NOT EXISTS trg_supplier_return_approval_limit
       BEFORE UPDATE OF status ON supplier_returns
       WHEN NEW.status = 'approved' AND OLD.status <> 'approved'
