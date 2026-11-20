@@ -61,6 +61,8 @@ class WmsShell extends StatefulWidget {
 
 class _WmsShellState extends State<WmsShell> {
   int _selected = 0;
+  int? _autoOpenPartnerPage;
+  bool _autoOpenProductForm = false;
 
   static const _pages = [
     ('dashboard', Icons.dashboard_outlined),
@@ -79,7 +81,15 @@ class _WmsShellState extends State<WmsShell> {
 
   void _selectPage(int index) {
     if (index < 0 || index >= _pages.length) return;
-    setState(() => _selected = index);
+    setState(() { _selected = index; _autoOpenPartnerPage = null; _autoOpenProductForm = false; });
+  }
+
+  void _openPartnerForm(int index) {
+    setState(() { _selected = index; _autoOpenPartnerPage = index; _autoOpenProductForm = false; });
+  }
+
+  void _openProductForm() {
+    setState(() { _selected = 1; _autoOpenProductForm = true; _autoOpenPartnerPage = null; });
   }
 
   Widget _navigationDrawer() => NavigationDrawer(
@@ -108,27 +118,27 @@ class _WmsShellState extends State<WmsShell> {
     final wide = width >= 720;
     final title = tr(_pages[_selected].$1);
     final content = _selected == 1
-        ? ProductManagementPage(tr: tr)
+        ? ProductManagementPage(key: ValueKey('products-$_autoOpenProductForm'), tr: tr, autoOpenAdd: _autoOpenProductForm)
         : _selected == 2
             ? CashierPage(
                 key: const ValueKey('receiving-cashier'),
                 tr: tr,
                 receiving: true,
-                onOpenPartners: () => _selectPage(4),
-                onOpenProducts: () => _selectPage(1),
+                onOpenPartners: () => _openPartnerForm(4),
+                onOpenProducts: _openProductForm,
               )
             : _selected == 3
                 ? CashierPage(
                     key: const ValueKey('issuing-cashier'),
                     tr: tr,
                     receiving: false,
-                    onOpenPartners: () => _selectPage(5),
-                    onOpenProducts: () => _selectPage(1),
+                    onOpenPartners: () => _openPartnerForm(5),
+                    onOpenProducts: _openProductForm,
                   )
                 : _selected == 4
-                    ? PartnerManagementPage(key: const ValueKey('suppliers-page'), tr: tr, suppliers: true)
+                    ? PartnerManagementPage(key: ValueKey('suppliers-$_autoOpenPartnerPage'), tr: tr, suppliers: true, autoOpenAdd: _autoOpenPartnerPage == 4)
                     : _selected == 5
-                        ? PartnerManagementPage(key: const ValueKey('recipients-page'), tr: tr, suppliers: false)
+                        ? PartnerManagementPage(key: ValueKey('recipients-$_autoOpenPartnerPage'), tr: tr, suppliers: false, autoOpenAdd: _autoOpenPartnerPage == 5)
                         : _selected == 6
                             ? BasicReportsPage(tr: tr)
                             : _selected == 7
