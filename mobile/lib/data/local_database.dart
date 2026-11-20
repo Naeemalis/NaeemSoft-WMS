@@ -12,7 +12,7 @@ class LocalDatabase {
     final path = p.join(root, 'naeemsoft_wms.db');
     _database = await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -22,10 +22,12 @@ class LocalDatabase {
         await _createSchema(db, version);
         await _createExtendedSchema(db);
         await _migrateV3(db);
+        await _migrateV4(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createExtendedSchema(db);
         if (oldVersion < 3) await _migrateV3(db);
+        if (oldVersion < 4) await _migrateV4(db);
       },
     );
     return _database!;
@@ -37,12 +39,13 @@ class LocalDatabase {
     final helper = LocalDatabase._();
     return openDatabase(
       inMemoryDatabasePath,
-      version: 3,
+      version: 4,
       onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, version) async {
         await helper._createSchema(db, version);
         await helper._createExtendedSchema(db);
         await helper._migrateV3(db);
+        await helper._migrateV4(db);
       },
     );
   }
@@ -561,6 +564,20 @@ class LocalDatabase {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_supplier_transactions_account_date
       ON supplier_transactions(supplier_id, transaction_date, id)
+    ''');
+  }
+
+  /// Repairs missing base-unit links for legacy products without deleting data.
+  Future<void> _migrateV4(Database db) async {
+    await db.execute('''
+      INSERT OR IGNORE INTO product_units
+        (product_id, unit_id, factor_to_base, can_receive, can_issue)
+      SELECT p.id, p.base_unit_id, 1, 1, 1
+      FROM products p
+      WHERE NOT EXISTS (
+        SELECT 1 FROM product_units pu
+        WHERE pu.product_id = p.id AND pu.unit_id = p.base_unit_id
+      )
     ''');
   }
 
