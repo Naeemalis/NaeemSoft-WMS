@@ -15,8 +15,8 @@ class LocalDatabase {
       version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
-        await db.execute('PRAGMA journal_mode = WAL');
-        await db.execute('PRAGMA busy_timeout = 5000');
+        await db.rawQuery('PRAGMA journal_mode = WAL');
+        await db.rawQuery('PRAGMA busy_timeout = 5000');
       },
       onCreate: (db, version) async {
         await _createSchema(db, version);
