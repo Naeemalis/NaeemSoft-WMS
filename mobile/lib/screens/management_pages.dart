@@ -1,0 +1,309 @@
+import 'package:flutter/material.dart';
+
+import '../data/local_database.dart';
+
+class ProductManagementPage extends StatefulWidget {
+  const ProductManagementPage({required this.tr, super.key});
+  final String Function(String) tr;
+
+  @override
+  State<ProductManagementPage> createState() => _ProductManagementPageState();
+}
+
+class _ProductManagementPageState extends State<ProductManagementPage> {
+  List<Map<String, Object?>> _products = [];
+  List<Map<String, Object?>> _units = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final db = await LocalDatabase.instance.database;
+    final products = await LocalDatabase.instance.getProducts();
+    final units = await db.query('units', orderBy: 'name_ar');
+    if (!mounted) return;
+    setState(() {
+      _products = products;
+      _units = units;
+      _loading = false;
+    });
+  }
+
+  Future<void> _addProduct() async {
+    final name = TextEditingController();
+    final minimum = TextEditingController(text: '0');
+    int? unitId = _units.isEmpty ? null : _units.first['id'] as int;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(widget.tr('addProduct')),
+          content: SizedBox(
+            width: 420,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(controller: name, decoration: InputDecoration(labelText: widget.tr('productName'))),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<int>(
+                initialValue: unitId,
+                decoration: InputDecoration(labelText: widget.tr('baseUnit')),
+                items: _units.map((unit) => DropdownMenuItem<int>(
+                  value: unit['id'] as int,
+                  child: Text((unit['name_ar'] ?? unit['code']).toString()),
+                )).toList(),
+                onChanged: (value) => setDialogState(() => unitId = value),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: minimum,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(labelText: widget.tr('minimumStock')),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(widget.tr('cancel'))),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(widget.tr('save'))),
+          ],
+        ),
+      ),
+    );
+    if (result == true && name.text.trim().isNotEmpty && unitId != null) {
+      final min = double.tryParse(minimum.text) ?? 0;
+      if (min < 0) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Minimum stock cannot be negative.')));
+      } else {
+        final db = await LocalDatabase.instance.database;
+        await db.transaction((txn) async {
+          final productId = await txn.insert('products', {
+            'name_ar': name.text.trim(),
+            'name_en': name.text.trim(),
+            'name_fr': name.text.trim(),
+            'base_unit_id': unitId,
+            'minimum_stock': min,
+          });
+          await txn.insert('product_units', {
+            'product_id': productId,
+            'unit_id': unitId,
+            'factor_to_base': 1,
+            'can_receive': 1,
+            'can_issue': 1,
+          });
+        });
+        await _load();
+      }
+    }
+    name.dispose();
+    minimum.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final columns = width < 420 ? 2 : width < 720 ? 3 : width < 1100 ? 5 : 7;
+    return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _units.isEmpty ? null : _addProduct,
+        icon: const Icon(Icons.add),
+        label: Text(widget.tr('addProduct')),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _products.isEmpty
+              ? Center(child: Text(widget.tr('noProducts')))
+              : GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 1.2,
+                  ),
+                  itemCount: _products.length,
+                  itemBuilder: (context, index) {
+                    final product = _products[index];
+                    final quantity = (product['available_quantity'] as num?)?.toDouble() ?? 0;
+                    final minimum = (product['minimum_stock'] as num?)?.toDouble() ?? 0;
+                    final color = quantity <= 0 ? Colors.red : quantity <= minimum && minimum > 0 ? Colors.orange : Colors.green;
+                    return Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Icon(Icons.inventory_2_outlined, color: color, size: 28),
+                          const SizedBox(height: 8),
+                          Text((product['name_ar'] ?? '').toString(), textAlign: TextAlign.center,
+                            maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 6),
+                          Text('${quantity.toStringAsFixed(quantity % 1 == 0 ? 0 : 2)} ${product['base_unit_name'] ?? ''}'),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+    );
+  }
+}
+
+class PartnerManagementPage extends StatefulWidget {
+  const PartnerManagementPage({required this.tr, required this.suppliers, super.key});
+  final String Function(String) tr;
+  final bool suppliers;
+
+  @override
+  State<PartnerManagementPage> createState() => _PartnerManagementPageState();
+}
+
+class _PartnerManagementPageState extends State<PartnerManagementPage> {
+  List<Map<String, Object?>> _items = [];
+  bool _loading = true;
+  String get _table => widget.suppliers ? 'suppliers' : 'recipients';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final db = await LocalDatabase.instance.database;
+    final rows = await db.query(_table, orderBy: 'name COLLATE NOCASE');
+    if (!mounted) return;
+    setState(() { _items = rows; _loading = false; });
+  }
+
+  Future<void> _add() async {
+    final name = TextEditingController();
+    final phone = TextEditingController();
+    final address = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(widget.tr('addPartner')),
+        content: SizedBox(
+          width: 420,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: name, decoration: InputDecoration(labelText: widget.tr('name'))),
+            const SizedBox(height: 10),
+            TextField(controller: phone, keyboardType: TextInputType.phone,
+              decoration: InputDecoration(labelText: widget.tr('phone'))),
+            const SizedBox(height: 10),
+            TextField(controller: address, decoration: InputDecoration(labelText: widget.tr('address'))),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(widget.tr('cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(widget.tr('save'))),
+        ],
+      ),
+    );
+    if (result == true && name.text.trim().isNotEmpty) {
+      final db = await LocalDatabase.instance.database;
+      await db.insert(_table, {
+        'name': name.text.trim(),
+        'phone': phone.text.trim().isEmpty ? null : phone.text.trim(),
+        'address': address.text.trim().isEmpty ? null : address.text.trim(),
+      });
+      await _load();
+    }
+    name.dispose();
+    phone.dispose();
+    address.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    floatingActionButton: FloatingActionButton.extended(
+      onPressed: _add,
+      icon: const Icon(Icons.person_add_alt_1),
+      label: Text(widget.tr('addPartner')),
+    ),
+    body: _loading
+        ? const Center(child: CircularProgressIndicator())
+        : _items.isEmpty
+            ? Center(child: Text(widget.tr('noPartners')))
+            : ListView.separated(
+                padding: const EdgeInsets.all(12),
+                itemCount: _items.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final item = _items[index];
+                  return ListTile(
+                    leading: CircleAvatar(child: Icon(widget.suppliers ? Icons.local_shipping_outlined : Icons.person_outline)),
+                    title: Text((item['name'] ?? '').toString()),
+                    subtitle: Text([
+                      if ((item['phone'] ?? '').toString().isNotEmpty) item['phone'].toString(),
+                      if ((item['address'] ?? '').toString().isNotEmpty) item['address'].toString(),
+                    ].join(' • ')),
+                    trailing: Icon(item['is_active'] == 1 ? Icons.check_circle_outline : Icons.block_outlined),
+                  );
+                },
+              ),
+  );
+}
+
+class BasicReportsPage extends StatefulWidget {
+  const BasicReportsPage({required this.tr, super.key});
+  final String Function(String) tr;
+
+  @override
+  State<BasicReportsPage> createState() => _BasicReportsPageState();
+}
+
+class _BasicReportsPageState extends State<BasicReportsPage> {
+  Map<String, int> _counts = {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final db = await LocalDatabase.instance.database;
+    final values = <String, int>{
+      'products': Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM products WHERE is_active = 1')) ?? 0,
+      'suppliers': Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM suppliers WHERE is_active = 1')) ?? 0,
+      'recipients': Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM recipients WHERE is_active = 1')) ?? 0,
+      'receipts': Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM receipts WHERE status = 'approved'")) ?? 0,
+      'issues': Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM issues WHERE status = 'approved'")) ?? 0,
+      'movements': Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM stock_movements')) ?? 0,
+    };
+    if (!mounted) return;
+    setState(() { _counts = values; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    final labels = {
+      'products': 'products',
+      'suppliers': 'suppliers',
+      'recipients': 'recipients',
+      'receipts': 'approvedReceipts',
+      'issues': 'approvedIssues',
+      'movements': 'stockMovements',
+    };
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(widget.tr('reports'), style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 12),
+          ..._counts.entries.map((entry) => Card(
+            child: ListTile(
+              leading: const Icon(Icons.assessment_outlined),
+              title: Text(widget.tr(labels[entry.key] ?? entry.key)),
+              trailing: Text(entry.value.toString(), style: Theme.of(context).textTheme.titleLarge),
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+}
