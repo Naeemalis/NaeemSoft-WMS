@@ -63,7 +63,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('addProduct'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.byType(TextField), findsNWidgets(2));
     await tester.enterText(find.byType(TextField).at(0), 'Widget test product');
     await tester.enterText(find.byType(TextField).at(1), '3');
