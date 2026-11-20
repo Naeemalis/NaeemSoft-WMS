@@ -12,7 +12,7 @@ class LocalDatabase {
     final path = p.join(root, 'naeemsoft_wms.db');
     _database = await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -28,6 +28,7 @@ class LocalDatabase {
         if (oldVersion < 2) await _createExtendedSchema(db);
         if (oldVersion < 3) await _migrateV3(db);
         if (oldVersion < 4) await _migrateV4(db);
+        if (oldVersion < 5) await _migrateV5(db);
       },
     );
     return _database!;
@@ -46,6 +47,7 @@ class LocalDatabase {
         await helper._createExtendedSchema(db);
         await helper._migrateV3(db);
         await helper._migrateV4(db);
+        await helper._migrateV5(db);
       },
     );
   }
@@ -568,6 +570,20 @@ class LocalDatabase {
   }
 
   /// Repairs missing base-unit links for legacy products without deleting data.
+  Future<void> _migrateV5(Database db) async {
+    // Repair the unit catalogue on upgraded installations without deleting user data.
+    const units = [
+      ['pcs', 'حبة', 'Piece', 'Pièce'], ['box', 'صندوق', 'Box', 'Boîte'],
+      ['carton', 'كرتون', 'Carton', 'Carton'], ['pack', 'باكت', 'Pack', 'Paquet'],
+      ['kg', 'كيلوغرام', 'Kilogram', 'Kilogramme'], ['g', 'غرام', 'Gram', 'Gramme'],
+      ['l', 'لتر', 'Litre', 'Litre'],
+    ];
+    for (final unit in units) {
+      await db.insert('units', {'code': unit[0], 'name_ar': unit[1], 'name_en': unit[2], 'name_fr': unit[3]}, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+    await _migrateV4(db);
+  }
+
   Future<void> _migrateV4(Database db) async {
     await db.execute('''
       INSERT OR IGNORE INTO product_units
