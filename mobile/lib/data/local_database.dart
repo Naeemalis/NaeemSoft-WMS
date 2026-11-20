@@ -12,7 +12,7 @@ class LocalDatabase {
     final path = p.join(root, 'naeemsoft_wms.db');
     _database = await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -24,6 +24,7 @@ class LocalDatabase {
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createExtendedSchema(db);
+        if (oldVersion < 3) await _migrateV3(db);
       },
     );
     return _database!;
@@ -35,7 +36,7 @@ class LocalDatabase {
     final helper = LocalDatabase._();
     return openDatabase(
       inMemoryDatabasePath,
-      version: 2,
+      version: 3,
       onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, version) async {
         await helper._createSchema(db, version);
@@ -546,6 +547,19 @@ class LocalDatabase {
     for (final statement in statements) {
       await db.execute(statement);
     }
+  }
+
+
+  Future<void> _migrateV3(Database db) async {
+    // A supplier document can be posted to the ledger only once.
+    await db.execute('''
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_transaction_source
+      ON supplier_transactions(document_type, document_id, transaction_type)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_supplier_transactions_account_date
+      ON supplier_transactions(supplier_id, transaction_date, id)
+    ''');
   }
 
   Future<List<Map<String, Object?>>> getProducts() async {
