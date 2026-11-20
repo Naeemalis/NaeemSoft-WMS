@@ -33,6 +33,8 @@ jobs:
         run: |
           flutter create --platforms=android --org com.naeemsoft --project-name naeemsoft_wms /tmp/naeemsoft_wms
           cp -R mobile/lib /tmp/naeemsoft_wms/
+          rm -rf /tmp/naeemsoft_wms/test
+          cp -R mobile/test /tmp/naeemsoft_wms/
           cp mobile/pubspec.yaml /tmp/naeemsoft_wms/pubspec.yaml
       - name: Resolve dependencies
         working-directory: /tmp/naeemsoft_wms
