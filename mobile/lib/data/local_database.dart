@@ -29,6 +29,21 @@ class LocalDatabase {
     return _database!;
   }
 
+  /// Opens the exact production schema in memory for deterministic SQLite tests.
+  /// The test suite supplies sqflite_common_ffi as the database factory.
+  static Future<Database> openInMemoryForTesting() async {
+    final helper = LocalDatabase._();
+    return openDatabase(
+      inMemoryDatabasePath,
+      version: 2,
+      onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
+      onCreate: (db, version) async {
+        await helper._createSchema(db, version);
+        await helper._createExtendedSchema(db);
+      },
+    );
+  }
+
   Future<void> _createSchema(Database db, int version) async {
     final statements = <String>[
       '''CREATE TABLE app_settings (
