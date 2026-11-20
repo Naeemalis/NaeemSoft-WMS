@@ -59,6 +59,7 @@ class InventoryOperations {
       final receipt = rows.first;
       final items = await txn.query('receipt_items', where: 'receipt_id = ?', whereArgs: [receiptId]);
       if (items.isEmpty) throw StateError('Cannot approve an empty receipt.');
+      final requestId = receipt['request_id'] as int?;
       for (final item in items) {
         final batchId = await txn.insert('inventory_batches', {
           'receipt_item_id': item['id'],
@@ -83,6 +84,16 @@ class InventoryOperations {
           'occurred_at': receipt['receipt_date'],
           'created_by': approvedBy,
         });
+        if (requestId != null) {
+          final changed = await txn.rawUpdate('''
+            UPDATE purchase_request_items
+            SET received_quantity_base = received_quantity_base + ?
+            WHERE request_id = ? AND product_id = ? AND unit_id = ?
+          ''', [item['received_quantity_base'], requestId, item['product_id'], item['unit_id']]);
+          if (changed != 1) {
+            throw StateError('Receipt line does not match exactly one purchase-request line.');
+          }
+        }
       }
       await txn.update('receipts', {
         'status': 'approved',
@@ -90,7 +101,6 @@ class InventoryOperations {
         'approved_at': DateTime.now().toIso8601String(),
       }, where: 'id = ?', whereArgs: [receiptId]);
 
-      final requestId = receipt['request_id'] as int?;
       if (requestId != null) await _refreshRequestProgress(txn, requestId);
     });
   }
