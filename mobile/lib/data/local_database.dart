@@ -6,6 +6,11 @@ class LocalDatabase {
   static final LocalDatabase instance = LocalDatabase._();
   Database? _database;
 
+  /// Injects an already-open database for widget tests; production uses [database].
+  static void useDatabaseForTesting(Database database) {
+    instance._database = database;
+  }
+
   Future<Database> get database async {
     if (_database != null) return _database!;
     final root = await getDatabasesPath();
