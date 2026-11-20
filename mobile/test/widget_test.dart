@@ -4,6 +4,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:naeemsoft_wms/data/inventory_operations.dart';
 import 'package:naeemsoft_wms/data/local_database.dart';
+import 'package:naeemsoft_wms/data/supplier_account_operations.dart';
 
 void main() {
   late Database db;
@@ -145,6 +146,41 @@ void main() {
     expect(Sqflite.firstIntValue(await db.rawQuery(
       'SELECT COUNT(*) FROM issue_allocations',
     )), 0);
+  });
+
+
+  test('supplier payment is posted once and reduces supplier payable', () async {
+    final receiptId = await operations.createReceipt(
+      number: 'R-LEDGER-001',
+      supplierId: supplierId,
+      receiptDate: DateTime(2026, 11, 20),
+      lines: [
+        ReceiptLineInput(
+          productId: productId,
+          unitId: unitId,
+          quantity: 10,
+          factorToBase: 1,
+          unitCost: 4,
+        ),
+      ],
+    );
+    await operations.approveReceipt(receiptId);
+    await operations.approveReceipt(receiptId);
+    final accounts = SupplierAccountOperations(db);
+    await accounts.recordPayment(
+      number: 'SP-001',
+      supplierId: supplierId,
+      date: DateTime(2026, 11, 20),
+      amount: 15,
+    );
+    final balance = await accounts.getBalances(supplierId: supplierId);
+    expect(balance['credit'], 40);
+    expect(balance['debit'], 15);
+    expect(balance['closing'], 25);
+    expect(Sqflite.firstIntValue(await db.rawQuery(
+      "SELECT COUNT(*) FROM supplier_transactions WHERE document_type = 'receipt' AND document_id = ?",
+      [receiptId],
+    )), 1);
   });
 
   test('stocktake freeze blocks receipt approval', () async {
