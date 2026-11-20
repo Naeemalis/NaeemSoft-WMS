@@ -52,11 +52,6 @@ void main() {
 
 
   testWidgets('cashier empty states expose working add-partner and add-product actions', (tester) async {
-    await tester.view.setPhysicalSize(const Size(390, 844));
-    await tester.view.setDevicePixelRatio(1);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
     await db.delete('suppliers');
     var partnerAction = false;
     await tester.pumpWidget(MaterialApp(
@@ -91,11 +86,6 @@ void main() {
   });
 
   testWidgets('product shortcut opens visible fields and saves a product', (tester) async {
-    await tester.view.setPhysicalSize(const Size(800, 1200));
-    await tester.view.setDevicePixelRatio(1);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
     await tester.pumpWidget(MaterialApp(
       home: ProductManagementPage(
         tr: (key) => key,
@@ -119,11 +109,6 @@ void main() {
   });
 
   testWidgets('supplier shortcut opens fields and persists supplier', (tester) async {
-    await tester.view.setPhysicalSize(const Size(800, 1200));
-    await tester.view.setDevicePixelRatio(1);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
     await tester.pumpWidget(MaterialApp(
       home: PartnerManagementPage(
         tr: (key) => key,
@@ -147,11 +132,6 @@ void main() {
   });
 
   testWidgets('recipient shortcut opens fields and persists recipient', (tester) async {
-    await tester.view.setPhysicalSize(const Size(800, 1200));
-    await tester.view.setDevicePixelRatio(1);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
     await tester.pumpWidget(MaterialApp(
       home: PartnerManagementPage(
         tr: (key) => key,
