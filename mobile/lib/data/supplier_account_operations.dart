@@ -151,34 +151,49 @@ class SupplierAccountOperations {
       final lines = await txn.query('supplier_return_items',
         where: 'supplier_return_id = ?', whereArgs: [returnId]);
       if (lines.isEmpty) throw StateError('Cannot approve an empty supplier return.');
+
+      // Validate aggregate quantity per batch before any mutation.
+      final batchTotals = <int, double>{};
       for (final line in lines) {
         final batchId = line['batch_id'] as int;
+        batchTotals[batchId] = (batchTotals[batchId] ?? 0) +
+            (line['quantity_base'] as num).toDouble();
+      }
+      for (final entry in batchTotals.entries) {
         final batches = await txn.query('inventory_batches',
-          where: 'id = ?', whereArgs: [batchId], limit: 1);
-        if (batches.isEmpty) throw StateError('Original receipt batch no longer exists.');
-        final batch = batches.first;
-        final available = (batch['remaining_quantity_base'] as num).toDouble();
-        final quantity = (line['quantity_base'] as num).toDouble();
-        if (available + 0.0000001 < quantity) {
+          where: 'id = ?', whereArgs: [entry.key], limit: 1);
+        if (batches.isEmpty ||
+            (batches.first['remaining_quantity_base'] as num).toDouble() + 0.0000001 < entry.value) {
           throw StateError('Insufficient remaining quantity in original receipt batch.');
         }
-        final left = available - quantity;
-        await txn.update('inventory_batches', {
-          'remaining_quantity_base': left,
-          if (left <= 0.0000001) 'status': 'depleted',
-        }, where: 'id = ?', whereArgs: [batchId]);
-        await txn.insert('stock_movements', {
-          'product_id': line['product_id'], 'batch_id': batchId,
-          'movement_type': 'supplier_return', 'direction': 'OUT',
-          'quantity_base': quantity, 'source_type': 'supplier_return',
-          'source_id': returnId, 'occurred_at': header['return_date'],
-          'created_by': approvedBy,
-        });
       }
+
+      // Trigger validates original receipt ownership and lifetime return cap.
+      // All checks happen before stock is changed; transaction rollback is atomic.
       await txn.update('supplier_returns', {
         'status': 'approved', 'approved_by': approvedBy,
         'approved_at': DateTime.now().toIso8601String(),
       }, where: 'id = ?', whereArgs: [returnId]);
+
+      for (final entry in batchTotals.entries) {
+        final batches = await txn.query('inventory_batches',
+          where: 'id = ?', whereArgs: [entry.key], limit: 1);
+        final available = (batches.first['remaining_quantity_base'] as num).toDouble();
+        final left = available - entry.value;
+        await txn.update('inventory_batches', {
+          'remaining_quantity_base': left,
+          if (left <= 0.0000001) 'status': 'depleted',
+        }, where: 'id = ?', whereArgs: [entry.key]);
+      }
+      for (final line in lines) {
+        await txn.insert('stock_movements', {
+          'product_id': line['product_id'], 'batch_id': line['batch_id'],
+          'movement_type': 'supplier_return', 'direction': 'OUT',
+          'quantity_base': line['quantity_base'], 'source_type': 'supplier_return',
+          'source_id': returnId, 'occurred_at': header['return_date'],
+          'created_by': approvedBy,
+        });
+      }
       await txn.insert('supplier_transactions', {
         'supplier_id': header['supplier_id'],
         'transaction_type': 'supplier_return',
