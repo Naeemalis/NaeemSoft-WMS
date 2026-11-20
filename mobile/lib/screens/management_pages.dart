@@ -38,67 +38,82 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     final name = TextEditingController();
     final minimum = TextEditingController(text: '0');
     int? unitId = _units.isEmpty ? null : _units.first['id'] as int;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(widget.tr('addProduct')),
-          content: SizedBox(
-            width: 420,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              TextField(controller: name, decoration: InputDecoration(labelText: widget.tr('productName'))),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<int>(
-                initialValue: unitId,
-                decoration: InputDecoration(labelText: widget.tr('baseUnit')),
-                items: _units.map((unit) => DropdownMenuItem<int>(
-                  value: unit['id'] as int,
-                  child: Text((unit['name_ar'] ?? unit['code']).toString()),
-                )).toList(),
-                onChanged: (value) => setDialogState(() => unitId = value),
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Text(widget.tr('addProduct')),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: 420,
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  TextField(controller: name, autofocus: true,
+                    decoration: InputDecoration(labelText: widget.tr('productName'))),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<int>(
+                    initialValue: unitId,
+                    decoration: InputDecoration(labelText: widget.tr('baseUnit')),
+                    items: _units.map((unit) => DropdownMenuItem<int>(
+                      value: unit['id'] as int,
+                      child: Text((unit['name_ar'] ?? unit['code']).toString()),
+                    )).toList(),
+                    onChanged: (value) => setDialogState(() => unitId = value),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: minimum,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(labelText: widget.tr('minimumStock')),
+                  ),
+                ]),
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: minimum,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(labelText: widget.tr('minimumStock')),
-              ),
-            ]),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(widget.tr('cancel'))),
+              FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(widget.tr('save'))),
+            ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(widget.tr('cancel'))),
-            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(widget.tr('save'))),
-          ],
         ),
-      ),
-    );
-    if (result == true && name.text.trim().isNotEmpty && unitId != null) {
-      final min = double.tryParse(minimum.text) ?? 0;
-      if (min < 0) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Minimum stock cannot be negative.')));
-      } else {
-        final db = await LocalDatabase.instance.database;
-        await db.transaction((txn) async {
-          final productId = await txn.insert('products', {
-            'name_ar': name.text.trim(),
-            'name_en': name.text.trim(),
-            'name_fr': name.text.trim(),
-            'base_unit_id': unitId,
-            'minimum_stock': min,
-          });
-          await txn.insert('product_units', {
-            'product_id': productId,
-            'unit_id': unitId,
-            'factor_to_base': 1,
-            'can_receive': 1,
-            'can_issue': 1,
-          });
-        });
-        await _load();
+      );
+      if (result != true || !mounted) return;
+      final parsedMinimum = double.tryParse(minimum.text.trim());
+      if (name.text.trim().isEmpty || unitId == null ||
+          parsedMinimum == null || !parsedMinimum.isFinite || parsedMinimum < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('أدخل اسم الصنف ووحدة الأساس وحد إعادة طلب صحيحاً.')),
+        );
+        return;
       }
+      final db = await LocalDatabase.instance.database;
+      await db.transaction((txn) async {
+        final productId = await txn.insert('products', {
+          'name_ar': name.text.trim(),
+          'name_en': name.text.trim(),
+          'name_fr': name.text.trim(),
+          'base_unit_id': unitId,
+          'minimum_stock': parsedMinimum,
+        });
+        await txn.insert('product_units', {
+          'product_id': productId,
+          'unit_id': unitId,
+          'factor_to_base': 1,
+          'can_receive': 1,
+          'can_issue': 1,
+        });
+      });
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تمت إضافة الصنف بنجاح.')),
+      );
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذرت إضافة الصنف: $error')),
+      );
+    } finally {
+      name.dispose();
+      minimum.dispose();
     }
-    name.dispose();
-    minimum.dispose();
   }
 
   Future<void> _editProduct(Map<String, Object?> product) async {
@@ -235,28 +250,38 @@ class _PartnerManagementPageState extends State<PartnerManagementPage> {
     final name = TextEditingController();
     final phone = TextEditingController();
     final address = TextEditingController();
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(widget.tr('addPartner')),
-        content: SizedBox(
-          width: 420,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: name, decoration: InputDecoration(labelText: widget.tr('name'))),
-            const SizedBox(height: 10),
-            TextField(controller: phone, keyboardType: TextInputType.phone,
-              decoration: InputDecoration(labelText: widget.tr('phone'))),
-            const SizedBox(height: 10),
-            TextField(controller: address, decoration: InputDecoration(labelText: widget.tr('address'))),
-          ]),
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(widget.tr('addPartner')),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: 420,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextField(controller: name, autofocus: true,
+                  decoration: InputDecoration(labelText: widget.tr('name'))),
+                const SizedBox(height: 10),
+                TextField(controller: phone, keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(labelText: widget.tr('phone'))),
+                const SizedBox(height: 10),
+                TextField(controller: address, decoration: InputDecoration(labelText: widget.tr('address'))),
+              ]),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(widget.tr('cancel'))),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(widget.tr('save'))),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(widget.tr('cancel'))),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(widget.tr('save'))),
-        ],
-      ),
-    );
-    if (result == true && name.text.trim().isNotEmpty) {
+      );
+      if (result != true || !mounted) return;
+      if (name.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('اسم المورد أو المستلم مطلوب.')),
+        );
+        return;
+      }
       final db = await LocalDatabase.instance.database;
       await db.insert(_table, {
         'name': name.text.trim(),
@@ -264,10 +289,18 @@ class _PartnerManagementPageState extends State<PartnerManagementPage> {
         'address': address.text.trim().isEmpty ? null : address.text.trim(),
       });
       await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.suppliers ? 'تمت إضافة المورد بنجاح.' : 'تمت إضافة المستلم بنجاح.')),
+      );
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذرت إضافة الجهة: $error')),
+      );
+    } finally {
+      name.dispose();
+      phone.dispose();
+      address.dispose();
     }
-    name.dispose();
-    phone.dispose();
-    address.dispose();
   }
 
   Future<void> _edit(Map<String, Object?> item) async {
