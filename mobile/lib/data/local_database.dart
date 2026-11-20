@@ -23,6 +23,7 @@ class LocalDatabase {
         await _createExtendedSchema(db);
         await _migrateV3(db);
         await _migrateV4(db);
+        await _migrateV5(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createExtendedSchema(db);
@@ -40,7 +41,7 @@ class LocalDatabase {
     final helper = LocalDatabase._();
     return openDatabase(
       inMemoryDatabasePath,
-      version: 4,
+      version: 5,
       onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, version) async {
         await helper._createSchema(db, version);
