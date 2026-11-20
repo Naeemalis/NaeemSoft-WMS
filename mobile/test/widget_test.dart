@@ -58,7 +58,7 @@ void main() {
 
 
   testWidgets('cashier empty states expose working add-partner and add-product actions', (tester) async {
-    await db.delete('suppliers');
+    await tester.runAsync(() => db.delete('suppliers'));
     var partnerAction = false;
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -74,9 +74,9 @@ void main() {
     await tester.tap(find.text('addPartner'));
     expect(partnerAction, isTrue);
 
-    await db.insert('suppliers', {'name': 'Supplier for product action'});
-    await db.delete('product_units');
-    await db.delete('products');
+    await tester.runAsync(() => db.insert('suppliers', {'name': 'Supplier for product action'}));
+    await tester.runAsync(() => db.delete('product_units'));
+    await tester.runAsync(() => db.delete('products'));
     var productAction = false;
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -111,9 +111,9 @@ void main() {
     await tester.tap(find.text('save'));
     await _pumpDatabase(tester);
 
-    final saved = await db.query('products', where: 'name_ar = ?', whereArgs: ['Widget test product']);
+    final saved = await tester.runAsync(() => db.query('products', where: 'name_ar = ?', whereArgs: ['Widget test product'])) ?? [];
     expect(saved, hasLength(1));
-    final mappings = await db.query('product_units', where: 'product_id = ?', whereArgs: [saved.single['id']]);
+    final mappings = await tester.runAsync(() => db.query('product_units', where: 'product_id = ?', whereArgs: [saved.single['id']])) ?? [];
     expect(mappings, hasLength(1));
     expect(find.text('Widget test product'), findsOneWidget);
     expect(returnedToCashier, isTrue);
@@ -138,7 +138,7 @@ void main() {
     await tester.tap(find.text('save'));
     await _pumpDatabase(tester);
 
-    final rows = await db.query('suppliers', where: 'name = ?', whereArgs: ['Widget supplier']);
+    final rows = await tester.runAsync(() => db.query('suppliers', where: 'name = ?', whereArgs: ['Widget supplier'])) ?? [];
     expect(rows, hasLength(1));
     expect(rows.single['phone'], '77712345');
     expect(find.text('Widget supplier'), findsOneWidget);
@@ -162,7 +162,7 @@ void main() {
     await tester.tap(find.text('save'));
     await _pumpDatabase(tester);
 
-    final rows = await db.query('recipients', where: 'name = ?', whereArgs: ['Widget recipient']);
+    final rows = await tester.runAsync(() => db.query('recipients', where: 'name = ?', whereArgs: ['Widget recipient'])) ?? [];
     expect(rows, hasLength(1));
     expect(find.text('Widget recipient'), findsOneWidget);
     expect(returnedToCashier, isTrue);
