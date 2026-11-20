@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'data/local_database.dart';
 import 'screens/cashier_page.dart';
+import 'screens/management_pages.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -98,14 +99,20 @@ class _WmsShellState extends State<WmsShell> {
     final wide = width >= 720;
     final title = tr(_pages[_selected].$1);
     final content = _selected == 1
-        ? ProductsPage(tr: tr)
+        ? ProductManagementPage(tr: tr)
         : _selected == 2
             ? CashierPage(tr: tr, receiving: true)
             : _selected == 3
                 ? CashierPage(tr: tr, receiving: false)
-                : _selected == 7
-                    ? SettingsPage(locale: widget.locale, onChanged: widget.onLocaleChanged, tr: tr)
-                    : DashboardPage(tr: tr, onOpen: (index) => setState(() => _selected = index));
+                : _selected == 4
+                    ? PartnerManagementPage(tr: tr, suppliers: true)
+                    : _selected == 5
+                        ? PartnerManagementPage(tr: tr, suppliers: false)
+                        : _selected == 6
+                            ? BasicReportsPage(tr: tr)
+                            : _selected == 7
+                                ? SettingsPage(locale: widget.locale, onChanged: widget.onLocaleChanged, tr: tr)
+                                : DashboardPage(tr: tr, onOpen: (index) => setState(() => _selected = index));
 
     return Scaffold(
       appBar: AppBar(
@@ -215,62 +222,6 @@ class DashboardPage extends StatelessWidget {
           StatusChip(color: Color(0xFF12B76A), label: 'متوفر'),
         ]),
       ]),
-    );
-  }
-}
-
-class ProductsPage extends StatelessWidget {
-  const ProductsPage({required this.tr, super.key});
-  final String Function(String) tr;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<Map<String, Object?>>>(
-      future: LocalDatabase.instance.getProducts(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return Center(child: Text(snapshot.error.toString()));
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final products = snapshot.data!;
-        final width = MediaQuery.sizeOf(context).width;
-        final columns = width < 380 ? 2 : width < 600 ? 3 : width < 900 ? 4 : width < 1250 ? 6 : 8;
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(tr('products'), style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 12),
-            Expanded(child: products.isEmpty
-              ? Center(child: Text(tr('noProducts')))
-              : GridView.builder(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: columns, crossAxisSpacing: 10, mainAxisSpacing: 10,
-                    childAspectRatio: width < 600 ? 1.2 : 1.35,
-                  ),
-                  itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    final product = products[index];
-                    final qty = (product['available_quantity'] as num?)?.toDouble() ?? 0;
-                    final min = (product['minimum_stock'] as num?)?.toDouble() ?? 0;
-                    final color = qty <= 0 ? const Color(0xFFD92D20)
-                        : min > 0 && qty <= min ? const Color(0xFFF79009)
-                        : const Color(0xFF12B76A);
-                    return Card(
-                      color: color.withValues(alpha: .09),
-                      child: Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                          Icon(Icons.inventory_2_outlined, color: color, size: 26),
-                          const SizedBox(height: 8),
-                          Text((product['name_ar'] ?? '').toString(), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 5),
-                          Text('${qty.toStringAsFixed(qty % 1 == 0 ? 0 : 2)} ${product['base_unit_name'] ?? ''}', textAlign: TextAlign.center),
-                        ]),
-                      ),
-                    );
-                  },
-                )),
-          ]),
-        );
-      },
     );
   }
 }
