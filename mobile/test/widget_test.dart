@@ -231,7 +231,7 @@ void main() {
     expect(result['recipients'], 2);
     expect(result['receipts'], 2);
     expect(result['issues'], 2);
-    expect(Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM products')), 5);
+    expect(Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM products WHERE sku LIKE 'DEMO-%')), 5);
     expect(Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM receipts WHERE status='approved'")), 2);
     expect(Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM issues WHERE status='approved'")), 2);
     expect(Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM stock_movements WHERE direction='IN'")), 5);
@@ -243,6 +243,23 @@ void main() {
     ''');
     expect(sugar.map((r)=>r['code']).toSet(), {'kg','g'});
     expect(sugar.first['factor_to_base'], 0.001);
+
+    final sugarId = Sqflite.firstIntValue(await db.rawQuery(
+      "SELECT id FROM products WHERE sku='DEMO-003'"));
+    final gramId = Sqflite.firstIntValue(await db.rawQuery(
+      "SELECT id FROM units WHERE code='g'"));
+    final recipient = Sqflite.firstIntValue(await db.rawQuery(
+      "SELECT id FROM recipients WHERE name='جهة الاستلام الأولى'"));
+    final gramIssue = await operations.createIssue(
+      number:'DEMO-I-GRAM', recipientId:recipient!,
+      issueDate:DateTime(2026,11,20),
+      lines:[IssueLineInput(productId:sugarId!,unitId:gramId!,
+        quantity:500,factorToBase:0.001,unitPrice:0.02)]);
+    await operations.approveIssue(gramIssue);
+    final sugarStock = await db.rawQuery(
+      "SELECT SUM(remaining_quantity_base) AS qty FROM inventory_batches WHERE product_id=?",
+      [sugarId]);
+    expect((sugarStock.first['qty'] as num).toDouble(), 44.5);
     final second = await DemoDataSeeder(db).seed();
     expect(second['alreadySeeded'], 1);
     expect(Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM products')), 5);
