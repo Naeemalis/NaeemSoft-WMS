@@ -72,6 +72,25 @@ class _WmsShellState extends State<WmsShell> {
   String tr(String key) => _strings[widget.locale.languageCode]?[key] ??
       _strings['en']![key] ?? key;
 
+  void _openMore() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [4, 5, 6, 7].map((index) => ListTile(
+            leading: Icon(_pages[index].$2),
+            title: Text(tr(_pages[index].$1)),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              setState(() => _selected = index);
+            },
+          )).toList(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
@@ -120,8 +139,14 @@ class _WmsShellState extends State<WmsShell> {
         ],
       ),
       bottomNavigationBar: wide ? null : NavigationBar(
-        selectedIndex: _selected > 4 ? 4 : _selected,
-        onDestinationSelected: (value) => setState(() => _selected = value),
+        selectedIndex: _selected > 3 ? 4 : _selected,
+        onDestinationSelected: (value) {
+          if (value == 4) {
+            _openMore();
+          } else {
+            setState(() => _selected = value);
+          }
+        },
         destinations: [
           NavigationDestination(icon: const Icon(Icons.dashboard_outlined), label: tr('dashboard')),
           NavigationDestination(icon: const Icon(Icons.inventory_2_outlined), label: tr('products')),
