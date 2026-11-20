@@ -77,24 +77,30 @@ class _WmsShellState extends State<WmsShell> {
   String tr(String key) => _strings[widget.locale.languageCode]?[key] ??
       _strings['en']![key] ?? key;
 
-  void _openMore() {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [4, 5, 6, 7, 8].map((index) => ListTile(
-            leading: Icon(_pages[index].$2),
-            title: Text(tr(_pages[index].$1)),
-            onTap: () {
-              Navigator.pop(sheetContext);
-              setState(() => _selected = index);
-            },
-          )).toList(),
-        ),
-      ),
-    );
+  void _selectPage(int index) {
+    if (index < 0 || index >= _pages.length) return;
+    setState(() => _selected = index);
   }
+
+  Widget _navigationDrawer() => NavigationDrawer(
+    selectedIndex: _selected,
+    onDestinationSelected: (index) {
+      Navigator.of(context).pop();
+      _selectPage(index);
+    },
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(24, 18, 24, 12),
+        child: Text('NaeemSoft-WMS', style: Theme.of(context).textTheme.titleLarge),
+      ),
+      const Divider(),
+      for (var i = 0; i < _pages.length; i++)
+        NavigationDrawerDestination(
+          icon: Icon(_pages[i].$2),
+          label: Text(tr(_pages[i].$1)),
+        ),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -120,6 +126,7 @@ class _WmsShellState extends State<WmsShell> {
                                     : DashboardPage(tr: tr, onOpen: (index) => setState(() => _selected = index));
 
     return Scaffold(
+      drawer: _navigationDrawer(),
       appBar: AppBar(
         title: Text('NaeemSoft-WMS • $title', maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
@@ -152,20 +159,13 @@ class _WmsShellState extends State<WmsShell> {
         ],
       ),
       bottomNavigationBar: wide ? null : NavigationBar(
-        selectedIndex: _selected > 3 ? 4 : _selected,
-        onDestinationSelected: (value) {
-          if (value == 4) {
-            _openMore();
-          } else {
-            setState(() => _selected = value);
-          }
-        },
+        selectedIndex: _selected <= 3 ? _selected : 0,
+        onDestinationSelected: _selectPage,
         destinations: [
           NavigationDestination(icon: const Icon(Icons.dashboard_outlined), label: tr('dashboard')),
           NavigationDestination(icon: const Icon(Icons.inventory_2_outlined), label: tr('products')),
           NavigationDestination(icon: const Icon(Icons.move_to_inbox_outlined), label: tr('receiving')),
           NavigationDestination(icon: const Icon(Icons.outbox_outlined), label: tr('issuing')),
-          NavigationDestination(icon: const Icon(Icons.menu), label: tr('more')),
         ],
       ),
     );
