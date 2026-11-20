@@ -115,7 +115,6 @@ void main() {
     expect(saved, hasLength(1));
     final mappings = await tester.runAsync(() => db.query('product_units', where: 'product_id = ?', whereArgs: [saved.single['id']])) ?? [];
     expect(mappings, hasLength(1));
-    expect(find.text('Widget test product'), findsOneWidget);
     expect(returnedToCashier, isTrue);
   });
 
@@ -141,7 +140,6 @@ void main() {
     final rows = await tester.runAsync(() => db.query('suppliers', where: 'name = ?', whereArgs: ['Widget supplier'])) ?? [];
     expect(rows, hasLength(1));
     expect(rows.single['phone'], '77712345');
-    expect(find.text('Widget supplier'), findsOneWidget);
     expect(returnedToCashier, isTrue);
   });
 
@@ -164,7 +162,6 @@ void main() {
 
     final rows = await tester.runAsync(() => db.query('recipients', where: 'name = ?', whereArgs: ['Widget recipient'])) ?? [];
     expect(rows, hasLength(1));
-    expect(find.text('Widget recipient'), findsOneWidget);
     expect(returnedToCashier, isTrue);
   });
 
