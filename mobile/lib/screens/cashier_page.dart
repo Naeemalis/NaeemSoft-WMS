@@ -4,9 +4,11 @@ import '../data/inventory_operations.dart';
 import '../data/local_database.dart';
 
 class CashierPage extends StatefulWidget {
-  const CashierPage({required this.tr, required this.receiving, super.key});
+  const CashierPage({required this.tr, required this.receiving, this.onOpenPartners, this.onOpenProducts, super.key});
   final String Function(String) tr;
   final bool receiving;
+  final VoidCallback? onOpenPartners;
+  final VoidCallback? onOpenProducts;
 
   @override
   State<CashierPage> createState() => _CashierPageState();
@@ -272,6 +274,23 @@ class _CashierPageState extends State<CashierPage> {
   }
 
   Widget _productGallery(double width) {
+    if (_products.isEmpty) {
+      return Center(child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.inventory_2_outlined, size: 44),
+          const SizedBox(height: 10),
+          Text(_label('noProducts')),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: () => widget.onOpenProducts?.call(),
+            icon: const Icon(Icons.add),
+            label: Text(_label('addProduct')),
+          ),
+          TextButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: Text(_label('refresh'))),
+        ]),
+      ));
+    }
     final columns = width < 380 ? 2 : width < 600 ? 3 : width < 900 ? 4 : 6;
     return GridView.builder(
       padding: const EdgeInsets.all(8),
@@ -436,9 +455,16 @@ class _CashierPageState extends State<CashierPage> {
       return Center(child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(widget.receiving ? Icons.local_shipping_outlined : Icons.people_alt_outlined, size: 44),
+          const SizedBox(height: 12),
           Text(_label(widget.receiving ? 'addSupplierFirst' : 'addRecipientFirst')),
           const SizedBox(height: 12),
-          OutlinedButton.icon(
+          FilledButton.icon(
+            onPressed: () => widget.onOpenPartners?.call(),
+            icon: const Icon(Icons.person_add_alt_1),
+            label: Text(_label('addPartner')),
+          ),
+          TextButton.icon(
             onPressed: _load,
             icon: const Icon(Icons.refresh),
             label: Text(_label('refresh')),
