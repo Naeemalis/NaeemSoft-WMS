@@ -86,10 +86,12 @@ void main() {
   });
 
   testWidgets('product shortcut opens visible fields and saves a product', (tester) async {
+    var returnedToCashier = false;
     await tester.pumpWidget(MaterialApp(
       home: ProductManagementPage(
         tr: (key) => key,
         autoOpenAdd: true,
+        onDone: () => returnedToCashier = true,
       ),
     ));
     await tester.pumpAndSettle();
@@ -106,14 +108,17 @@ void main() {
     final mappings = await db.query('product_units', where: 'product_id = ?', whereArgs: [saved.single['id']]);
     expect(mappings, hasLength(1));
     expect(find.text('Widget test product'), findsOneWidget);
+    expect(returnedToCashier, isTrue);
   });
 
   testWidgets('supplier shortcut opens fields and persists supplier', (tester) async {
+    var returnedToCashier = false;
     await tester.pumpWidget(MaterialApp(
       home: PartnerManagementPage(
         tr: (key) => key,
         suppliers: true,
         autoOpenAdd: true,
+        onDone: () => returnedToCashier = true,
       ),
     ));
     await tester.pumpAndSettle();
@@ -129,14 +134,17 @@ void main() {
     expect(rows, hasLength(1));
     expect(rows.single['phone'], '77712345');
     expect(find.text('Widget supplier'), findsOneWidget);
+    expect(returnedToCashier, isTrue);
   });
 
   testWidgets('recipient shortcut opens fields and persists recipient', (tester) async {
+    var returnedToCashier = false;
     await tester.pumpWidget(MaterialApp(
       home: PartnerManagementPage(
         tr: (key) => key,
         suppliers: false,
         autoOpenAdd: true,
+        onDone: () => returnedToCashier = true,
       ),
     ));
     await tester.pumpAndSettle();
@@ -149,6 +157,7 @@ void main() {
     final rows = await db.query('recipients', where: 'name = ?', whereArgs: ['Widget recipient']);
     expect(rows, hasLength(1));
     expect(find.text('Widget recipient'), findsOneWidget);
+    expect(returnedToCashier, isTrue);
   });
 
   test('fresh database seeds the units required by product and cashier forms', () async {
