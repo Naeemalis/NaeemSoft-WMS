@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -6,6 +7,7 @@ import 'package:naeemsoft_wms/data/inventory_operations.dart';
 import 'package:naeemsoft_wms/data/local_database.dart';
 import 'package:naeemsoft_wms/data/supplier_account_operations.dart';
 import 'package:naeemsoft_wms/data/demo_data_seeder.dart';
+import 'package:naeemsoft_wms/screens/management_pages.dart';
 
 void main() {
   late Database db;
@@ -22,6 +24,7 @@ void main() {
 
   setUp(() async {
     db = await LocalDatabase.openInMemoryForTesting();
+    LocalDatabase.useDatabaseForTesting(db);
     operations = InventoryOperations(db);
     unitId = Sqflite.firstIntValue(await db.rawQuery(
       "SELECT id FROM units WHERE code = 'kg'",
@@ -39,8 +42,93 @@ void main() {
     });
   });
 
-  tearDown(() async => db.close());
+  tearDown(() async {
+    LocalDatabase.clearDatabaseForTesting();
+    await db.close();
+  });
 
+
+
+  testWidgets('product shortcut opens visible fields and saves a product', (tester) async {
+    await tester.view.setPhysicalSize(const Size(800, 1200));
+    await tester.view.setDevicePixelRatio(1);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(
+      home: ProductManagementPage(
+        tr: (key) => key,
+        autoOpenAdd: true,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('addProduct'), findsOneWidget);
+    expect(find.byType(TextField), findsNWidgets(2));
+    await tester.enterText(find.byType(TextField).at(0), 'Widget test product');
+    await tester.enterText(find.byType(TextField).at(1), '3');
+    await tester.tap(find.text('save'));
+    await tester.pumpAndSettle();
+
+    final saved = await db.query('products', where: 'name_ar = ?', whereArgs: ['Widget test product']);
+    expect(saved, hasLength(1));
+    final mappings = await db.query('product_units', where: 'product_id = ?', whereArgs: [saved.single['id']]);
+    expect(mappings, hasLength(1));
+    expect(find.text('Widget test product'), findsOneWidget);
+  });
+
+  testWidgets('supplier shortcut opens fields and persists supplier', (tester) async {
+    await tester.view.setPhysicalSize(const Size(800, 1200));
+    await tester.view.setDevicePixelRatio(1);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(
+      home: PartnerManagementPage(
+        tr: (key) => key,
+        suppliers: true,
+        autoOpenAdd: true,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TextField), findsNWidgets(3));
+    await tester.enterText(find.byType(TextField).at(0), 'Widget supplier');
+    await tester.enterText(find.byType(TextField).at(1), '77712345');
+    await tester.enterText(find.byType(TextField).at(2), 'Test address');
+    await tester.tap(find.text('save'));
+    await tester.pumpAndSettle();
+
+    final rows = await db.query('suppliers', where: 'name = ?', whereArgs: ['Widget supplier']);
+    expect(rows, hasLength(1));
+    expect(rows.single['phone'], '77712345');
+    expect(find.text('Widget supplier'), findsOneWidget);
+  });
+
+  testWidgets('recipient shortcut opens fields and persists recipient', (tester) async {
+    await tester.view.setPhysicalSize(const Size(800, 1200));
+    await tester.view.setDevicePixelRatio(1);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(
+      home: PartnerManagementPage(
+        tr: (key) => key,
+        suppliers: false,
+        autoOpenAdd: true,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TextField), findsNWidgets(3));
+    await tester.enterText(find.byType(TextField).at(0), 'Widget recipient');
+    await tester.tap(find.text('save'));
+    await tester.pumpAndSettle();
+
+    final rows = await db.query('recipients', where: 'name = ?', whereArgs: ['Widget recipient']);
+    expect(rows, hasLength(1));
+    expect(find.text('Widget recipient'), findsOneWidget);
+  });
 
   test('fresh database seeds the units required by product and cashier forms', () async {
     final rows = await db.query('units', orderBy: 'code');
