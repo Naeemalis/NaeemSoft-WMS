@@ -57,6 +57,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: CashierPage(
+          key: const ValueKey('partner-action'),
           tr: (key) => key,
           receiving: true,
           onOpenPartners: () => partnerAction = true,
@@ -74,6 +75,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: CashierPage(
+          key: const ValueKey('product-action'),
           tr: (key) => key,
           receiving: true,
           onOpenProducts: () => productAction = true,
