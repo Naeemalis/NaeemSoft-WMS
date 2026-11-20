@@ -10,6 +10,11 @@ import 'package:naeemsoft_wms/data/demo_data_seeder.dart';
 import 'package:naeemsoft_wms/screens/management_pages.dart';
 import 'package:naeemsoft_wms/screens/cashier_page.dart';
 
+Future<void> _pumpDatabase(WidgetTester tester) async {
+  await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   late Database db;
   late InventoryOperations operations;
@@ -64,7 +69,7 @@ void main() {
         ),
       ),
     ));
-    await tester.pumpAndSettle();
+    await _pumpDatabase(tester);
     await tester.tap(find.text('addPartner'));
     expect(partnerAction, isTrue);
 
@@ -82,7 +87,7 @@ void main() {
         ),
       ),
     ));
-    await tester.pumpAndSettle();
+    await _pumpDatabase(tester);
     await tester.tap(find.text('addProduct'));
     expect(productAction, isTrue);
   });
@@ -96,14 +101,14 @@ void main() {
         onDone: () => returnedToCashier = true,
       ),
     ));
-    await tester.pumpAndSettle();
+    await _pumpDatabase(tester);
 
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.byType(TextField), findsNWidgets(2));
     await tester.enterText(find.byType(TextField).at(0), 'Widget test product');
     await tester.enterText(find.byType(TextField).at(1), '3');
     await tester.tap(find.text('save'));
-    await tester.pumpAndSettle();
+    await _pumpDatabase(tester);
 
     final saved = await db.query('products', where: 'name_ar = ?', whereArgs: ['Widget test product']);
     expect(saved, hasLength(1));
@@ -123,14 +128,14 @@ void main() {
         onDone: () => returnedToCashier = true,
       ),
     ));
-    await tester.pumpAndSettle();
+    await _pumpDatabase(tester);
 
     expect(find.byType(TextField), findsNWidgets(3));
     await tester.enterText(find.byType(TextField).at(0), 'Widget supplier');
     await tester.enterText(find.byType(TextField).at(1), '77712345');
     await tester.enterText(find.byType(TextField).at(2), 'Test address');
     await tester.tap(find.text('save'));
-    await tester.pumpAndSettle();
+    await _pumpDatabase(tester);
 
     final rows = await db.query('suppliers', where: 'name = ?', whereArgs: ['Widget supplier']);
     expect(rows, hasLength(1));
@@ -149,12 +154,12 @@ void main() {
         onDone: () => returnedToCashier = true,
       ),
     ));
-    await tester.pumpAndSettle();
+    await _pumpDatabase(tester);
 
     expect(find.byType(TextField), findsNWidgets(3));
     await tester.enterText(find.byType(TextField).at(0), 'Widget recipient');
     await tester.tap(find.text('save'));
-    await tester.pumpAndSettle();
+    await _pumpDatabase(tester);
 
     final rows = await db.query('recipients', where: 'name = ?', whereArgs: ['Widget recipient']);
     expect(rows, hasLength(1));
