@@ -8,6 +8,7 @@ import 'package:naeemsoft_wms/data/local_database.dart';
 import 'package:naeemsoft_wms/data/supplier_account_operations.dart';
 import 'package:naeemsoft_wms/data/demo_data_seeder.dart';
 import 'package:naeemsoft_wms/screens/management_pages.dart';
+import 'package:naeemsoft_wms/screens/cashier_page.dart';
 
 void main() {
   late Database db;
@@ -48,6 +49,45 @@ void main() {
   });
 
 
+
+
+  testWidgets('cashier empty states expose working add-partner and add-product actions', (tester) async {
+    await tester.view.setPhysicalSize(const Size(390, 844));
+    await tester.view.setDevicePixelRatio(1);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await db.delete('suppliers');
+    var partnerAction = false;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: CashierPage(
+          tr: (key) => key,
+          receiving: true,
+          onOpenPartners: () => partnerAction = true,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('addPartner'));
+    expect(partnerAction, isTrue);
+
+    await db.insert('suppliers', {'name': 'Supplier for product action'});
+    await db.delete('products');
+    var productAction = false;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: CashierPage(
+          tr: (key) => key,
+          receiving: true,
+          onOpenProducts: () => productAction = true,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('addProduct'));
+    expect(productAction, isTrue);
+  });
 
   testWidgets('product shortcut opens visible fields and saves a product', (tester) async {
     await tester.view.setPhysicalSize(const Size(800, 1200));
