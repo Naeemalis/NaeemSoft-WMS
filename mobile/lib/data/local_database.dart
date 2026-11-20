@@ -11,6 +11,10 @@ class LocalDatabase {
     instance._database = database;
   }
 
+  static void clearDatabaseForTesting() {
+    instance._database = null;
+  }
+
   Future<Database> get database async {
     if (_database != null) return _database!;
     final root = await getDatabasesPath();
