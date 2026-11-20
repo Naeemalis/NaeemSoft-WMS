@@ -21,6 +21,7 @@ class LocalDatabase {
       onCreate: (db, version) async {
         await _createSchema(db, version);
         await _createExtendedSchema(db);
+        await _migrateV3(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createExtendedSchema(db);
