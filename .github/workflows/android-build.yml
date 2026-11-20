@@ -1,0 +1,54 @@
+name: Build NaeemSoft-WMS Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/android-build.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/android-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Android project wrapper
+        run: |
+          flutter create --platforms=android --org com.naeemsoft --project-name naeemsoft_wms /tmp/naeemsoft_wms
+          cp -R mobile/lib /tmp/naeemsoft_wms/
+          cp mobile/pubspec.yaml /tmp/naeemsoft_wms/pubspec.yaml
+      - name: Resolve dependencies
+        working-directory: /tmp/naeemsoft_wms
+        run: flutter pub get
+      - name: Analyze
+        working-directory: /tmp/naeemsoft_wms
+        run: flutter analyze
+      - name: Run tests
+        working-directory: /tmp/naeemsoft_wms
+        run: flutter test
+      - name: Build release APK
+        working-directory: /tmp/naeemsoft_wms
+        run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NaeemSoft-WMS-Android-APK
+          path: /tmp/naeemsoft_wms/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
