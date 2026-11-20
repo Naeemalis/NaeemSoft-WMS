@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'data/local_database.dart';
 import 'screens/cashier_page.dart';
 import 'screens/management_pages.dart';
+import 'screens/supplier_statement_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,6 +70,7 @@ class _WmsShellState extends State<WmsShell> {
     ('recipients', Icons.people_alt_outlined),
     ('reports', Icons.assessment_outlined),
     ('settings', Icons.settings_outlined),
+    ('supplierStatement', Icons.account_balance_wallet_outlined),
   ];
 
   String tr(String key) => _strings[widget.locale.languageCode]?[key] ??
@@ -80,7 +82,7 @@ class _WmsShellState extends State<WmsShell> {
       builder: (sheetContext) => SafeArea(
         child: ListView(
           shrinkWrap: true,
-          children: [4, 5, 6, 7].map((index) => ListTile(
+          children: [4, 5, 6, 7, 8].map((index) => ListTile(
             leading: Icon(_pages[index].$2),
             title: Text(tr(_pages[index].$1)),
             onTap: () {
@@ -112,7 +114,9 @@ class _WmsShellState extends State<WmsShell> {
                             ? BasicReportsPage(tr: tr)
                             : _selected == 7
                                 ? SettingsPage(locale: widget.locale, onChanged: widget.onLocaleChanged, tr: tr)
-                                : DashboardPage(tr: tr, onOpen: (index) => setState(() => _selected = index));
+                                : _selected == 8
+                                    ? SupplierStatementPage(tr: tr)
+                                    : DashboardPage(tr: tr, onOpen: (index) => setState(() => _selected = index));
 
     return Scaffold(
       appBar: AppBar(
@@ -184,6 +188,7 @@ class DashboardPage extends StatelessWidget {
       ('recipients', Icons.people_alt_outlined, 5),
       ('reports', Icons.assessment_outlined, 6),
       ('settings', Icons.settings_outlined, 7),
+      ('supplierStatement', Icons.account_balance_wallet_outlined, 8),
     ];
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -268,7 +273,7 @@ class StatusChip extends StatelessWidget {
 const Map<String, Map<String, String>> _strings = {
   'ar': {
     'dashboard':'لوحة التحكم','products':'الأصناف','receiving':'كاشير الاستلام','issuing':'كاشير الصرف',
-    'suppliers':'الموردون','recipients':'المستلمون','reports':'التقارير والكشوف','settings':'الإعدادات','more':'المزيد',
+    'suppliers':'الموردون','recipients':'المستلمون','reports':'التقارير والكشوف','settings':'الإعدادات','more':'المزيد','supplierStatement':'كشف حساب المورد',
     'welcome':'مرحباً بك في NaeemSoft-WMS','offlineSingle':'إدارة مخزن واحد محلياً على هذا الجهاز دون الحاجة إلى الإنترنت.',
     'statusLegend':'دلالات ألوان الأصناف','noProducts':'لا توجد أصناف مسجلة بعد.','noAvailableProducts':'لا توجد أصناف متاحة للصرف.',
     'receivingRule':'اختر المورد ثم أضف الأصناف إلى فاتورة الاستلام. لا يضاف المخزون إلا بعد اعتماد الاستلام.',
@@ -289,7 +294,7 @@ const Map<String, Map<String, String>> _strings = {
   },
   'en': {
     'dashboard':'Dashboard','products':'Products','receiving':'Receiving cashier','issuing':'Issue cashier',
-    'suppliers':'Suppliers','recipients':'Recipients','reports':'Reports & statements','settings':'Settings','more':'More',
+    'suppliers':'Suppliers','recipients':'Recipients','reports':'Reports & statements','settings':'Settings','more':'More','supplierStatement':'Supplier statement',
     'welcome':'Welcome to NaeemSoft-WMS','offlineSingle':'Manage one warehouse locally on this device without internet.',
     'statusLegend':'Product status colors','noProducts':'No products have been registered yet.','noAvailableProducts':'No products are available to issue.',
     'receivingRule':'Select a supplier and add products to a receipt. Stock increases only after approval.',
@@ -310,7 +315,7 @@ const Map<String, Map<String, String>> _strings = {
   },
   'fr': {
     'dashboard':'Tableau de bord','products':'Articles','receiving':'Caisse de réception','issuing':'Caisse de sortie',
-    'suppliers':'Fournisseurs','recipients':'Destinataires','reports':'Rapports et relevés','settings':'Paramètres','more':'Plus',
+    'suppliers':'Fournisseurs','recipients':'Destinataires','reports':'Rapports et relevés','settings':'Paramètres','more':'Plus','supplierStatement':'Relevé fournisseur',
     'welcome':'Bienvenue dans NaeemSoft-WMS','offlineSingle':'Gérez un seul dépôt localement sur cet appareil, sans Internet.',
     'statusLegend':'Couleurs d’état des articles','noProducts':'Aucun article enregistré.','noAvailableProducts':'Aucun article disponible pour la sortie.',
     'receivingRule':'Choisissez un fournisseur et ajoutez les articles au reçu. Le stock augmente après validation.',
