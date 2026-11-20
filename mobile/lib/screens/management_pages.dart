@@ -215,6 +215,70 @@ class _PartnerManagementPageState extends State<PartnerManagementPage> {
     address.dispose();
   }
 
+  Future<void> _edit(Map<String, Object?> item) async {
+    final name = TextEditingController(text: (item['name'] ?? '').toString());
+    final phone = TextEditingController(text: (item['phone'] ?? '').toString());
+    final address = TextEditingController(text: (item['address'] ?? '').toString());
+    var active = item['is_active'] == 1;
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: const Text('تعديل بيانات الجهة'),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: 420,
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  TextField(controller: name, decoration: InputDecoration(labelText: widget.tr('name'))),
+                  const SizedBox(height: 10),
+                  TextField(controller: phone, keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(labelText: widget.tr('phone'))),
+                  const SizedBox(height: 10),
+                  TextField(controller: address, decoration: InputDecoration(labelText: widget.tr('address'))),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('الجهة نشطة'),
+                    value: active,
+                    onChanged: (value) => setDialogState(() => active = value),
+                  ),
+                ]),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(widget.tr('cancel'))),
+              FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(widget.tr('save'))),
+            ],
+          ),
+        ),
+      );
+      if (result != true || !mounted) return;
+      if (name.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اسم الجهة مطلوب.')));
+        return;
+      }
+      final db = await LocalDatabase.instance.database;
+      await db.update(_table, {
+        'name': name.text.trim(),
+        'phone': phone.text.trim().isEmpty ? null : phone.text.trim(),
+        'address': address.text.trim().isEmpty ? null : address.text.trim(),
+        'is_active': active ? 1 : 0,
+      }, where: 'id = ?', whereArgs: [item['id']]);
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تحديث بيانات الجهة.')),
+      );
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تحديث بيانات الجهة: $error')),
+      );
+    } finally {
+      name.dispose();
+      phone.dispose();
+      address.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     floatingActionButton: FloatingActionButton.extended(
@@ -239,7 +303,12 @@ class _PartnerManagementPageState extends State<PartnerManagementPage> {
                       if ((item['phone'] ?? '').toString().isNotEmpty) item['phone'].toString(),
                       if ((item['address'] ?? '').toString().isNotEmpty) item['address'].toString(),
                     ].join(' • ')),
-                    trailing: Icon(item['is_active'] == 1 ? Icons.check_circle_outline : Icons.block_outlined),
+                    onTap: () => _edit(item),
+                    trailing: IconButton(
+                      tooltip: 'تعديل / تفعيل الجهة',
+                      onPressed: () => _edit(item),
+                      icon: Icon(item['is_active'] == 1 ? Icons.edit_outlined : Icons.edit_off_outlined),
+                    ),
                   );
                 },
               ),
