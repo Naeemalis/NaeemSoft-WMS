@@ -41,6 +41,14 @@ void main() {
 
   tearDown(() async => db.close());
 
+
+  test('fresh database seeds the units required by product and cashier forms', () async {
+    final rows = await db.query('units', orderBy: 'code');
+    final codes = rows.map((row) => row['code']).toSet();
+    expect(codes, containsAll({'pcs', 'box', 'carton', 'pack', 'kg', 'g', 'l'}));
+    expect(rows, isNotEmpty);
+  });
+
   test('draft receipt does not change stock; approval creates a batch', () async {
     final receiptId = await operations.createReceipt(
       number: 'R-001',
