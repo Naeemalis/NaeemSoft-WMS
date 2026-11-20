@@ -15,6 +15,7 @@ class CashierPage extends StatefulWidget {
 class _CashierPageState extends State<CashierPage> {
   List<Map<String, Object?>> _products = [];
   List<Map<String, Object?>> _partners = [];
+  final Map<int, List<Map<String, Object?>>> _unitOptions = {};
   final List<_CashierLine> _cart = [];
   int? _partnerId;
   int? _documentId;
@@ -39,6 +40,12 @@ class _CashierPageState extends State<CashierPage> {
   Future<void> _load() async {
     final db = await LocalDatabase.instance.database;
     final products = await LocalDatabase.instance.getProducts();
+    final unitRows = await db.rawQuery('''
+      SELECT pu.product_id, pu.unit_id, pu.factor_to_base, u.name_ar, u.code
+      FROM product_units pu JOIN units u ON u.id = pu.unit_id
+      WHERE pu.can_receive = 1 OR pu.can_issue = 1
+      ORDER BY pu.id
+    ''');
     final partners = await db.query(
       widget.receiving ? 'suppliers' : 'recipients',
       where: 'is_active = 1',
@@ -50,6 +57,11 @@ class _CashierPageState extends State<CashierPage> {
           ? products
           : products.where((p) => ((p['available_quantity'] as num?) ?? 0) > 0).toList();
       _partners = partners;
+      _unitOptions.clear();
+      for (final row in unitRows) {
+        final productId = row['product_id'] as int;
+        _unitOptions.putIfAbsent(productId, () => []).add(row);
+      }
       if (_partnerId != null && !_partners.any((p) => p['id'] == _partnerId)) {
         _partnerId = null;
       }
@@ -60,7 +72,8 @@ class _CashierPageState extends State<CashierPage> {
 
   void _addProduct(Map<String, Object?> product) {
     if (_documentId != null) return;
-    final line = _CashierLine(product);
+    final options = _unitOptions[product['id'] as int] ?? [];
+    final line = _CashierLine(product, options);
     setState(() => _cart.add(line));
   }
 
@@ -79,9 +92,9 @@ class _CashierPageState extends State<CashierPage> {
           receiptDate: DateTime.now(),
           lines: _cart.map((line) => ReceiptLineInput(
             productId: line.product['id'] as int,
-            unitId: line.product['base_unit_id'] as int,
+            unitId: line.unitId,
             quantity: line.quantityValue,
-            factorToBase: 1,
+            factorToBase: line.factorToBase,
             unitCost: line.priceValue,
           )).toList(),
         );
@@ -93,9 +106,9 @@ class _CashierPageState extends State<CashierPage> {
           issueDate: DateTime.now(),
           lines: _cart.map((line) => IssueLineInput(
             productId: line.product['id'] as int,
-            unitId: line.product['base_unit_id'] as int,
+            unitId: line.unitId,
             quantity: line.quantityValue,
-            factorToBase: 1,
+            factorToBase: line.factorToBase,
             unitPrice: line.priceValue,
           )).toList(),
         );
@@ -259,6 +272,28 @@ class _CashierPageState extends State<CashierPage> {
                             ),
                             const SizedBox(width: 6),
                             Expanded(
+                              flex: 2,
+                              child: DropdownButtonFormField<int>(
+                                value: line.unitId,
+                                isExpanded: true,
+                                decoration: const InputDecoration(labelText: 'الوحدة'),
+                                items: line.units.map((u) => DropdownMenuItem<int>(
+                                  value: u['unit_id'] as int,
+                                  child: Text((u['name_ar'] ?? u['code']).toString(),
+                                    overflow: TextOverflow.ellipsis),
+                                )).toList(),
+                                onChanged: _documentId == null ? (value) {
+                                  if (value == null) return;
+                                  final selected = line.units.firstWhere((u) => u['unit_id'] == value);
+                                  setState(() {
+                                    line.unitId = value;
+                                    line.factorToBase = (selected['factor_to_base'] as num).toDouble();
+                                  });
+                                } : null,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
                               child: TextField(
                                 controller: line.quantity,
                                 enabled: _documentId == null,
@@ -369,12 +404,17 @@ class _CashierPageState extends State<CashierPage> {
 }
 
 class _CashierLine {
-  _CashierLine(this.product)
+  _CashierLine(this.product, this.units)
       : quantity = TextEditingController(text: '1'),
-        price = TextEditingController(text: '0');
+        price = TextEditingController(text: '0'),
+        unitId = product['base_unit_id'] as int,
+        factorToBase = 1;
   final Map<String, Object?> product;
+  final List<Map<String, Object?>> units;
   final TextEditingController quantity;
   final TextEditingController price;
+  int unitId;
+  double factorToBase;
   double get quantityValue => double.tryParse(quantity.text) ?? 0;
   double get priceValue => double.tryParse(price.text) ?? 0;
 }
