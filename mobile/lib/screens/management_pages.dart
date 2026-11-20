@@ -205,7 +205,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     crossAxisCount: columns,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
-                    childAspectRatio: 1.2,
+                    childAspectRatio: columns >= 5 ? 0.85 : 1.2,
                   ),
                   itemCount: _products.length,
                   itemBuilder: (context, index) {
