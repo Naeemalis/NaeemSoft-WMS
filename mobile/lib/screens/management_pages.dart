@@ -4,8 +4,9 @@ import 'package:sqflite/sqflite.dart';
 import '../data/local_database.dart';
 
 class ProductManagementPage extends StatefulWidget {
-  const ProductManagementPage({required this.tr, super.key});
+  const ProductManagementPage({required this.tr, this.autoOpenAdd = false, super.key});
   final String Function(String) tr;
+  final bool autoOpenAdd;
 
   @override
   State<ProductManagementPage> createState() => _ProductManagementPageState();
@@ -19,7 +20,9 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _load().then((_) {
+      if (widget.autoOpenAdd && mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _addProduct(); });
+    });
   }
 
   Future<void> _load() async {
@@ -233,9 +236,10 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
 }
 
 class PartnerManagementPage extends StatefulWidget {
-  const PartnerManagementPage({required this.tr, required this.suppliers, super.key});
+  const PartnerManagementPage({required this.tr, required this.suppliers, this.autoOpenAdd = false, super.key});
   final String Function(String) tr;
   final bool suppliers;
+  final bool autoOpenAdd;
 
   @override
   State<PartnerManagementPage> createState() => _PartnerManagementPageState();
@@ -249,7 +253,9 @@ class _PartnerManagementPageState extends State<PartnerManagementPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _load().then((_) {
+      if (widget.autoOpenAdd && mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _add(); });
+    });
   }
 
   Future<void> _load() async {
