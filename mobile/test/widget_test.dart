@@ -165,7 +165,6 @@ void main() {
       ],
     );
     await operations.approveReceipt(receiptId);
-    await operations.approveReceipt(receiptId);
     final accounts = SupplierAccountOperations(db);
     await accounts.recordPayment(
       number: 'SP-001',
