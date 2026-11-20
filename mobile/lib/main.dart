@@ -128,6 +128,13 @@ class _WmsShellState extends State<WmsShell> {
     return Scaffold(
       drawer: _navigationDrawer(),
       appBar: AppBar(
+        leading: Builder(
+          builder: (context) => IconButton(
+            tooltip: 'القائمة الرئيسية',
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         title: Text('NaeemSoft-WMS • $title', maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           Padding(
