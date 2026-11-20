@@ -114,6 +114,9 @@ class InventoryOperations {
     String? notes,
   }) async {
     if (lines.isEmpty) throw ArgumentError('An issue must contain at least one line.');
+    if (lines.any((line) => line.unitPrice <= 0)) {
+      throw ArgumentError('Every issue line must have a sale price greater than zero.');
+    }
     _validateLines(lines.map((line) => (line.quantity, line.factorToBase, line.unitPrice)));
     return db.transaction((txn) async {
       final total = lines.fold<double>(0, (sum, line) => sum + line.quantity * line.unitPrice);
