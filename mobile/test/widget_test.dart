@@ -183,6 +183,46 @@ void main() {
     )), 1);
   });
 
+
+  test('supplier return reduces the original batch and supplier payable', () async {
+    final receiptId = await operations.createReceipt(
+      number: 'R-RETURN-001',
+      supplierId: supplierId,
+      receiptDate: DateTime(2026, 11, 20),
+      lines: [
+        ReceiptLineInput(
+          productId: productId, unitId: unitId,
+          quantity: 10, factorToBase: 1, unitCost: 4,
+        ),
+      ],
+    );
+    await operations.approveReceipt(receiptId);
+    final receiptItem = (await db.query('receipt_items')).single;
+    final batch = (await db.query('inventory_batches')).single;
+    final accounts = SupplierAccountOperations(db);
+    final returnId = await accounts.createSupplierReturn(
+      number: 'SR-001', supplierId: supplierId,
+      date: DateTime(2026, 11, 20),
+      lines: [
+        SupplierReturnLineInput(
+          receiptItemId: receiptItem['id'] as int,
+          batchId: batch['id'] as int,
+          productId: productId, unitId: unitId,
+          quantity: 3, factorToBase: 1,
+        ),
+      ],
+    );
+    await accounts.approveSupplierReturn(returnId);
+    expect((await db.query('inventory_batches')).single['remaining_quantity_base'], 7);
+    final balance = await accounts.getBalances(supplierId: supplierId);
+    expect(balance['credit'], 40);
+    expect(balance['debit'], 12);
+    expect(balance['closing'], 28);
+    expect(Sqflite.firstIntValue(await db.rawQuery(
+      "SELECT COUNT(*) FROM stock_movements WHERE source_type = 'supplier_return'",
+    )), 1);
+  });
+
   test('stocktake freeze blocks receipt approval', () async {
     final receiptId = await operations.createReceipt(
       number: 'R-004',
