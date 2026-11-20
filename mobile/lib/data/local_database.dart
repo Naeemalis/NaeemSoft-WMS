@@ -42,6 +42,7 @@ class LocalDatabase {
       onCreate: (db, version) async {
         await helper._createSchema(db, version);
         await helper._createExtendedSchema(db);
+        await helper._migrateV3(db);
       },
     );
   }
