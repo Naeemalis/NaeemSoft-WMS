@@ -5,6 +5,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:naeemsoft_wms/data/inventory_operations.dart';
 import 'package:naeemsoft_wms/data/local_database.dart';
 import 'package:naeemsoft_wms/data/supplier_account_operations.dart';
+import 'package:naeemsoft_wms/data/demo_data_seeder.dart';
 
 void main() {
   late Database db;
@@ -220,6 +221,31 @@ void main() {
     expect(Sqflite.firstIntValue(await db.rawQuery(
       "SELECT COUNT(*) FROM stock_movements WHERE source_type = 'supplier_return'",
     )), 1);
+  });
+
+
+  test('demo seed creates five products, two suppliers, two recipients and two full workflow cycles', () async {
+    final result = await DemoDataSeeder(db).seed();
+    expect(result['products'], 5);
+    expect(result['suppliers'], 2);
+    expect(result['recipients'], 2);
+    expect(result['receipts'], 2);
+    expect(result['issues'], 2);
+    expect(Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM products')), 5);
+    expect(Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM receipts WHERE status='approved'")), 2);
+    expect(Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM issues WHERE status='approved'")), 2);
+    expect(Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM stock_movements WHERE direction='IN'")), 5);
+    expect(Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM stock_movements WHERE direction='OUT'")), 5);
+    final sugar = await db.rawQuery('''
+      SELECT pu.factor_to_base, u.code FROM product_units pu
+      JOIN products p ON p.id=pu.product_id JOIN units u ON u.id=pu.unit_id
+      WHERE p.sku='DEMO-003' ORDER BY pu.factor_to_base
+    ''');
+    expect(sugar.map((r)=>r['code']).toSet(), {'kg','g'});
+    expect(sugar.first['factor_to_base'], 0.001);
+    final second = await DemoDataSeeder(db).seed();
+    expect(second['alreadySeeded'], 1);
+    expect(Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM products')), 5);
   });
 
   test('stocktake freeze blocks receipt approval', () async {
