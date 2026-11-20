@@ -283,6 +283,20 @@ class LocalDatabase {
     for (final statement in statements) {
       await db.execute(statement);
     }
+    final unitBatch = db.batch();
+    final units = [
+      ['pcs', 'حبة', 'Piece', 'Pièce'],
+      ['box', 'صندوق', 'Box', 'Boîte'],
+      ['carton', 'كرتون', 'Carton', 'Carton'],
+      ['pack', 'باكت', 'Pack', 'Paquet'],
+      ['kg', 'كيلوغرام', 'Kilogram', 'Kilogramme'],
+      ['g', 'غرام', 'Gram', 'Gramme'],
+      ['l', 'لتر', 'Litre', 'Litre'],
+    ];
+    for (final unit in units) {
+      unitBatch.insert('units', {'code': unit[0], 'name_ar': unit[1], 'name_en': unit[2], 'name_fr': unit[3]});
+    }
+    await unitBatch.commit(noResult: true);
     await db.insert('app_settings', {'setting_key': 'language', 'setting_value': 'ar'});
     await db.insert('app_settings', {'setting_key': 'stagnation_days', 'setting_value': '90'});
     await db.insert('app_settings', {'setting_key': 'expiry_warning_days', 'setting_value': '30'});
