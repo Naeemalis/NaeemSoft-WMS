@@ -100,6 +100,24 @@ class InventoryOperations {
         'approved_by': approvedBy,
         'approved_at': DateTime.now().toIso8601String(),
       }, where: 'id = ?', whereArgs: [receiptId]);
+      // Supplier payable is credited exactly once when the receipt is approved.
+      await txn.insert('supplier_transactions', {
+        'supplier_id': receipt['supplier_id'],
+        'transaction_type': 'receipt',
+        'document_type': 'receipt',
+        'document_id': receiptId,
+        'debit': 0,
+        'credit': receipt['total_cost'],
+        'transaction_date': receipt['receipt_date'],
+        'notes': 'Approved receipt ${receipt['receipt_number']}',
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      await txn.insert('audit_logs', {
+        'user_id': approvedBy,
+        'action': 'approve',
+        'entity_type': 'receipt',
+        'entity_id': receiptId,
+        'details': 'Receipt approved; supplier ledger credited.',
+      });
 
       if (requestId != null) await _refreshRequestProgress(txn, requestId);
     });
