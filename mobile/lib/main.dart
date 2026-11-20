@@ -110,13 +110,25 @@ class _WmsShellState extends State<WmsShell> {
     final content = _selected == 1
         ? ProductManagementPage(tr: tr)
         : _selected == 2
-            ? CashierPage(tr: tr, receiving: true)
+            ? CashierPage(
+                key: const ValueKey('receiving-cashier'),
+                tr: tr,
+                receiving: true,
+                onOpenPartners: () => _selectPage(4),
+                onOpenProducts: () => _selectPage(1),
+              )
             : _selected == 3
-                ? CashierPage(tr: tr, receiving: false)
+                ? CashierPage(
+                    key: const ValueKey('issuing-cashier'),
+                    tr: tr,
+                    receiving: false,
+                    onOpenPartners: () => _selectPage(5),
+                    onOpenProducts: () => _selectPage(1),
+                  )
                 : _selected == 4
-                    ? PartnerManagementPage(tr: tr, suppliers: true)
+                    ? PartnerManagementPage(key: const ValueKey('suppliers-page'), tr: tr, suppliers: true)
                     : _selected == 5
-                        ? PartnerManagementPage(tr: tr, suppliers: false)
+                        ? PartnerManagementPage(key: const ValueKey('recipients-page'), tr: tr, suppliers: false)
                         : _selected == 6
                             ? BasicReportsPage(tr: tr)
                             : _selected == 7
