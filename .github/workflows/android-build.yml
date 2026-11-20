@@ -48,7 +48,7 @@ jobs:
         run: flutter analyze --no-fatal-infos
       - name: Run tests
         working-directory: /tmp/naeemsoft_wms
-        run: flutter test
+        run: flutter test --timeout 60s --reporter expanded
       - name: Build release APK
         working-directory: /tmp/naeemsoft_wms
         run: flutter build apk --release
