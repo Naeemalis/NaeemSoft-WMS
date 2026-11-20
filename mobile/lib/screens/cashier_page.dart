@@ -43,7 +43,7 @@ class _CashierPageState extends State<CashierPage> {
     final unitRows = await db.rawQuery('''
       SELECT pu.product_id, pu.unit_id, pu.factor_to_base, u.name_ar, u.code
       FROM product_units pu JOIN units u ON u.id = pu.unit_id
-      WHERE pu.can_receive = 1 OR pu.can_issue = 1
+      WHERE pu.${widget.receiving ? 'can_receive' : 'can_issue'} = 1
       ORDER BY pu.id
     ''');
     final partners = await db.query(
@@ -71,14 +71,44 @@ class _CashierPageState extends State<CashierPage> {
   String _label(String key) => widget.tr(key);
 
   void _addProduct(Map<String, Object?> product) {
-    if (_documentId != null) return;
+    if (_documentId != null || _busy) return;
     final options = _unitOptions[product['id'] as int] ?? [];
+    final baseUnitId = product['base_unit_id'] as int;
+    final baseOption = options.where((u) => u['unit_id'] == baseUnitId).toList();
+    if (options.isEmpty || baseOption.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا توجد وحدات مفعّلة لهذه العملية لهذا الصنف.')),
+      );
+      return;
+    }
     final line = _CashierLine(product, options);
-    setState(() => _cart.add(line));
+    setState(() {
+      line.factorToBase = (baseOption.first['factor_to_base'] as num).toDouble();
+      _cart.add(line);
+    });
   }
 
   Future<void> _saveDraft() async {
-    if (_busy || _partnerId == null || _cart.isEmpty) return;
+    if (_busy) return;
+    if (_partnerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى اختيار الجهة أولاً.')));
+      return;
+    }
+    if (_cart.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أضف صنفاً واحداً على الأقل.')));
+      return;
+    }
+    for (final line in _cart) {
+      if (!line.quantityValue.isFinite || line.quantityValue <= 0 ||
+          !line.priceValue.isFinite || line.priceValue < 0 ||
+          (!widget.receiving && line.priceValue <= 0) ||
+          !line.factorToBase.isFinite || line.factorToBase <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تحقق من الكمية والسعر والوحدة للصنف: ${line.product['name_ar']}')),
+        );
+        return;
+      }
+    }
     setState(() => _busy = true);
     try {
       final db = await LocalDatabase.instance.database;
@@ -166,23 +196,63 @@ class _CashierPageState extends State<CashierPage> {
     }
   }
 
-  void _cancelDraft() async {
-    if (_documentId == null || _busy) return;
-    final db = await LocalDatabase.instance.database;
-    final table = widget.receiving ? 'receipts' : 'issues';
-    await db.update(table, {'status': 'cancelled'}, where: 'id = ?', whereArgs: [_documentId]);
-    if (!mounted) return;
-    for (final line in _cart) {
-      line.quantity.dispose();
-      line.price.dispose();
+  Future<void> _cancelDraft() async {
+    final id = _documentId;
+    if (id == null || _busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('إلغاء المستند'),
+        content: const Text('هل تريد إلغاء المسودة؟ لن يتم تعديل المخزون.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(_label('cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(_label('cancelDraft'))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final db = await LocalDatabase.instance.database;
+      final table = widget.receiving ? 'receipts' : 'issues';
+      await db.transaction((txn) async {
+        final changed = await txn.update(
+          table, {'status': 'cancelled'},
+          where: "id = ? AND status IN ('draft','pending_approval')",
+          whereArgs: [id],
+        );
+        if (changed != 1) throw StateError('لا يمكن إلغاء هذا المستند لأنه لم يعد مسودة.');
+        await txn.insert('audit_logs', {
+          'action': 'cancel',
+          'entity_type': widget.receiving ? 'receipt' : 'issue',
+          'entity_id': id,
+          'details': 'Draft document cancelled from cashier.',
+        });
+      });
+      if (!mounted) return;
+      for (final line in _cart) {
+        line.quantity.dispose();
+        line.price.dispose();
+      }
+      setState(() {
+        _cart.clear();
+        _documentId = null;
+        _documentNumber = null;
+        _partnerId = null;
+      });
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم إلغاء المسودة بنجاح.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إلغاء المسودة: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    setState(() {
-      _cart.clear();
-      _documentId = null;
-      _documentNumber = null;
-      _partnerId = null;
-    });
-    await _load();
   }
 
   Widget _partnerPicker() {
