@@ -41,6 +41,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   Future<void> _addProduct() async {
     final name = TextEditingController();
     final minimum = TextEditingController(text: '0');
+    String productType = 'count';
     int? baseUnitId = _units.isEmpty ? null : _units.first['id'] as int;
     final drafts = <int, _ProductUnitDraft>{};
     if (baseUnitId != null) {
@@ -61,6 +62,18 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     controller: name,
                     autofocus: true,
                     decoration: InputDecoration(labelText: widget.tr('productName')),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: productType,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'طبيعة الصنف'),
+                    items: const [
+                      DropdownMenuItem(value: 'count', child: Text('عددي')),
+                      DropdownMenuItem(value: 'weight', child: Text('وزني')),
+                      DropdownMenuItem(value: 'liquid', child: Text('سائل')),
+                    ],
+                    onChanged: (value) => setDialogState(() => productType = value ?? 'count'),
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<int>(
@@ -228,6 +241,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
           'name_en': name.text.trim(),
           'name_fr': name.text.trim(),
           'base_unit_id': baseUnitId,
+          'product_type': productType,
           'minimum_stock': parsedMinimum,
         });
         for (final entry in selected) {
@@ -267,6 +281,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     final minimum = TextEditingController(
       text: ((product['minimum_stock'] as num?) ?? 0).toString(),
     );
+    String productType = (product['product_type'] ?? 'count').toString();
     final baseUnitId = product['base_unit_id'] as int;
     final db = await LocalDatabase.instance.database;
     final existingRows = await db.query(
@@ -309,6 +324,18 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                   TextField(
                     controller: name,
                     decoration: InputDecoration(labelText: widget.tr('productName')),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: productType,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'طبيعة الصنف'),
+                    items: const [
+                      DropdownMenuItem(value: 'count', child: Text('عددي')),
+                      DropdownMenuItem(value: 'weight', child: Text('وزني')),
+                      DropdownMenuItem(value: 'liquid', child: Text('سائل')),
+                    ],
+                    onChanged: (value) => setDialogState(() => productType = value ?? 'count'),
                   ),
                   const SizedBox(height: 10),
                   TextField(
@@ -467,6 +494,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
           'name_ar': name.text.trim(),
           'name_en': name.text.trim(),
           'name_fr': name.text.trim(),
+          'product_type': productType,
           'minimum_stock': min,
         }, where: 'id = ?', whereArgs: [product['id']]);
 

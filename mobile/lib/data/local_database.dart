@@ -21,7 +21,7 @@ class LocalDatabase {
     final path = p.join(root, 'naeemsoft_wms.db');
     _database = await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -34,6 +34,7 @@ class LocalDatabase {
         await _migrateV4(db);
         await _migrateV5(db);
         await _migrateV6(db);
+        await _migrateV7(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createExtendedSchema(db);
@@ -41,6 +42,7 @@ class LocalDatabase {
         if (oldVersion < 4) await _migrateV4(db);
         if (oldVersion < 5) await _migrateV5(db);
         if (oldVersion < 6) await _migrateV6(db);
+        if (oldVersion < 7) await _migrateV7(db);
       },
     );
     return _database!;
@@ -52,7 +54,7 @@ class LocalDatabase {
     final helper = LocalDatabase._();
     return openDatabase(
       inMemoryDatabasePath,
-      version: 6,
+      version: 7,
       onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, version) async {
         await helper._createSchema(db, version);
@@ -61,6 +63,7 @@ class LocalDatabase {
         await helper._migrateV4(db);
         await helper._migrateV5(db);
         await helper._migrateV6(db);
+        await helper._migrateV7(db);
       },
     );
   }
@@ -334,6 +337,11 @@ class LocalDatabase {
       ['kg', 'كيلوغرام', 'Kilogram', 'Kilogramme'],
       ['g', 'غرام', 'Gram', 'Gramme'],
       ['l', 'لتر', 'Litre', 'Litre'],
+      ['bag', 'كيس', 'Bag', 'Sac'],
+      ['ton', 'طن', 'Tonne', 'Tonne'],
+      ['ml', 'ملليلتر', 'Millilitre', 'Millilitre'],
+      ['gallon', 'جالون', 'Gallon', 'Gallon'],
+      ['barrel', 'برميل', 'Barrel', 'Baril'],
     ];
     for (final unit in units) {
       unitBatch.insert('units', {'code': unit[0], 'name_ar': unit[1], 'name_en': unit[2], 'name_fr': unit[3]});
@@ -590,6 +598,30 @@ class LocalDatabase {
         ALTER TABLE product_units
         ADD COLUMN sale_price REAL NOT NULL DEFAULT 0 CHECK(sale_price >= 0)
       ''');
+    }
+  }
+
+  /// Adds a product nature classification without changing existing product data.
+  Future<void> _migrateV7(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(products)');
+    if (!columns.any((column) => column['name'] == 'product_type')) {
+      await db.execute('''
+        ALTER TABLE products
+        ADD COLUMN product_type TEXT NOT NULL DEFAULT 'count'
+          CHECK(product_type IN ('count','weight','liquid'))
+      ''');
+    }
+    const additionalUnits = [
+      ['bag', 'كيس', 'Bag', 'Sac'],
+      ['ton', 'طن', 'Tonne', 'Tonne'],
+      ['ml', 'ملليلتر', 'Millilitre', 'Millilitre'],
+      ['gallon', 'جالون', 'Gallon', 'Gallon'],
+      ['barrel', 'برميل', 'Barrel', 'Baril'],
+    ];
+    for (final unit in additionalUnits) {
+      await db.insert('units', {
+        'code': unit[0], 'name_ar': unit[1], 'name_en': unit[2], 'name_fr': unit[3],
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 

@@ -108,6 +108,10 @@ void main() {
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.byType(TextField), findsAtLeastNWidgets(4));
     await tester.enterText(find.byType(TextField).at(0), 'Widget test product');
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('وزني').last);
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(1), '3');
     await tester.enterText(find.byType(TextField).at(3), '5');
     await tester.tap(find.text('save'));
@@ -115,6 +119,7 @@ void main() {
 
     final saved = await tester.runAsync(() => db.query('products', where: 'name_ar = ?', whereArgs: ['Widget test product'])) ?? [];
     expect(saved, hasLength(1));
+    expect(saved.single['product_type'], 'weight');
     final mappings = await tester.runAsync(() => db.query('product_units', where: 'product_id = ?', whereArgs: [saved.single['id']])) ?? [];
     expect(mappings, hasLength(1));
     expect(mappings.single['sale_price'], 5.0);
@@ -266,8 +271,49 @@ void main() {
   test('fresh database seeds the units required by product and cashier forms', () async {
     final rows = await db.query('units', orderBy: 'code');
     final codes = rows.map((row) => row['code']).toSet();
-    expect(codes, containsAll({'pcs', 'box', 'carton', 'pack', 'kg', 'g', 'l'}));
+    expect(codes, containsAll({'pcs', 'box', 'carton', 'pack', 'kg', 'g', 'l', 'bag', 'ton', 'ml', 'gallon', 'barrel'}));
     expect(rows, isNotEmpty);
+    final productColumns = await db.rawQuery('PRAGMA table_info(products)');
+    expect(productColumns.any((column) => column['name'] == 'product_type'), isTrue);
+  });
+
+
+
+  test('one receipt supports the same product in multiple units with independent purchase prices', () async {
+    final pcsId = Sqflite.firstIntValue(await db.rawQuery("SELECT id FROM units WHERE code = 'pcs'"))!;
+    final cartonId = Sqflite.firstIntValue(await db.rawQuery("SELECT id FROM units WHERE code = 'carton'"))!;
+    final packId = Sqflite.firstIntValue(await db.rawQuery("SELECT id FROM units WHERE code = 'pack'"))!;
+    final product = await db.insert('products', {
+      'name_ar': 'منتج متعدد العبوات',
+      'base_unit_id': pcsId,
+      'product_type': 'count',
+    });
+    await db.insert('product_units', {
+      'product_id': product, 'unit_id': pcsId, 'factor_to_base': 1,
+      'sale_price': 10, 'can_receive': 1, 'can_issue': 1,
+    });
+    await db.insert('product_units', {
+      'product_id': product, 'unit_id': cartonId, 'factor_to_base': 24,
+      'sale_price': 200, 'can_receive': 1, 'can_issue': 1,
+    });
+    await db.insert('product_units', {
+      'product_id': product, 'unit_id': packId, 'factor_to_base': 6,
+      'sale_price': 55, 'can_receive': 1, 'can_issue': 1,
+    });
+    final receiptId = await operations.createReceipt(
+      number: 'R-MULTI-UNIT-PRICE',
+      supplierId: supplierId,
+      receiptDate: DateTime(2026, 11, 24),
+      lines: [
+        ReceiptLineInput(productId: product, unitId: cartonId, quantity: 2, factorToBase: 24, unitCost: 120),
+        ReceiptLineInput(productId: product, unitId: packId, quantity: 3, factorToBase: 6, unitCost: 42),
+        ReceiptLineInput(productId: product, unitId: pcsId, quantity: 5, factorToBase: 1, unitCost: 8),
+      ],
+    );
+    final lines = await db.query('receipt_items', where: 'receipt_id = ?', whereArgs: [receiptId], orderBy: 'id');
+    expect(lines, hasLength(3));
+    expect(lines.map((line) => line['unit_cost']).toList(), [120, 42, 8]);
+    expect(lines.map((line) => line['received_quantity_base']).toList(), [48, 18, 5]);
   });
 
   test('draft receipt does not change stock; approval creates a batch', () async {
