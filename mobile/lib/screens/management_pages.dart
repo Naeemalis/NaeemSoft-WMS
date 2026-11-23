@@ -44,7 +44,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     int? baseUnitId = _units.isEmpty ? null : _units.first['id'] as int;
     final drafts = <int, _ProductUnitDraft>{};
     if (baseUnitId != null) {
-      drafts[baseUnitId!] = _ProductUnitDraft(isSelected: true, factor: '1');
+      drafts[baseUnitId] = _ProductUnitDraft(isSelected: true, factor: '1');
     }
 
     try {
