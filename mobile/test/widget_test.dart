@@ -9,6 +9,7 @@ import 'package:naeemsoft_wms/data/supplier_account_operations.dart';
 import 'package:naeemsoft_wms/data/demo_data_seeder.dart';
 import 'package:naeemsoft_wms/screens/management_pages.dart';
 import 'package:naeemsoft_wms/screens/cashier_page.dart';
+import 'package:naeemsoft_wms/screens/issue_cashier_page.dart';
 
 Future<void> _pumpDatabase(WidgetTester tester) async {
   await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
@@ -105,9 +106,10 @@ void main() {
     await _pumpDatabase(tester);
 
     expect(find.byType(AlertDialog), findsOneWidget);
-    expect(find.byType(TextField), findsNWidgets(2));
+    expect(find.byType(TextField), findsAtLeastNWidgets(4));
     await tester.enterText(find.byType(TextField).at(0), 'Widget test product');
     await tester.enterText(find.byType(TextField).at(1), '3');
+    await tester.enterText(find.byType(TextField).at(3), '5');
     await tester.tap(find.text('save'));
     await _pumpDatabase(tester);
 
@@ -115,6 +117,7 @@ void main() {
     expect(saved, hasLength(1));
     final mappings = await tester.runAsync(() => db.query('product_units', where: 'product_id = ?', whereArgs: [saved.single['id']])) ?? [];
     expect(mappings, hasLength(1));
+    expect(mappings.single['sale_price'], 5.0);
     expect(returnedToCashier, isTrue);
   });
 
@@ -163,6 +166,57 @@ void main() {
     final rows = await tester.runAsync(() => db.query('recipients', where: 'name = ?', whereArgs: ['Widget recipient'])) ?? [];
     expect(rows, hasLength(1));
     expect(returnedToCashier, isTrue);
+  });
+
+  testWidgets('issue cashier selects product units dynamically and deducts stock only on approval', (tester) async {
+    await db.update('product_units', {'sale_price': 5},
+      where: 'product_id = ? AND unit_id = ?', whereArgs: [productId, unitId]);
+    final receiptId = await operations.createReceipt(
+      number: 'R-ISSUE-CASHIER-UI',
+      supplierId: supplierId,
+      receiptDate: DateTime(2026, 11, 23),
+      lines: [
+        ReceiptLineInput(
+          productId: productId,
+          unitId: unitId,
+          quantity: 20,
+          factorToBase: 1,
+          unitCost: 2,
+        ),
+      ],
+    );
+    await operations.approveReceipt(receiptId);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: IssueCashierPage(tr: (key) => key),
+      ),
+    ));
+    await _pumpDatabase(tester);
+
+    expect(find.text('صنف تجريبي'), findsOneWidget);
+    await tester.tap(find.text('صنف تجريبي'));
+    await tester.pump();
+    expect(find.text('كيلوغرام'), findsOneWidget);
+    await tester.tap(find.text('2'));
+    await tester.tap(find.text('كيلوغرام'));
+    await tester.tap(find.text('إضافة إلى السلة'));
+    await tester.pump();
+
+    expect(find.text('السلة (1) • 10'), findsOneWidget);
+    expect((await db.query('inventory_batches')).single['remaining_quantity_base'], 20);
+
+    await tester.tap(find.text('السلة (1) • 10'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('saveDraft'));
+    await _pumpDatabase(tester);
+    expect((await db.query('inventory_batches')).single['remaining_quantity_base'], 20);
+    expect((await db.query('issues')).single['status'], 'draft');
+
+    await tester.tap(find.text('approveDocument'));
+    await _pumpDatabase(tester);
+    expect((await db.query('inventory_batches')).single['remaining_quantity_base'], 18);
+    expect((await db.query('issues')).single['status'], 'approved');
   });
 
   test('fresh database seeds the units required by product and cashier forms', () async {
