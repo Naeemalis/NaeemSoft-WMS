@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'data/local_database.dart';
 import 'screens/cashier_page.dart';
+import 'screens/issue_cashier_page.dart';
 import 'screens/management_pages.dart';
 import 'screens/supplier_statement_page.dart';
 import 'data/demo_data_seeder.dart';
@@ -135,11 +136,10 @@ class _WmsShellState extends State<WmsShell> {
                 onOpenProducts: _openProductForm,
               )
             : _selected == 3
-                ? CashierPage(
+                ? IssueCashierPage(
                     key: const ValueKey('issuing-cashier'),
                     tr: tr,
-                    receiving: false,
-                    onOpenPartners: () => _openPartnerForm(5),
+                    onOpenRecipients: () => _openPartnerForm(5),
                     onOpenProducts: _openProductForm,
                   )
                 : _selected == 4
