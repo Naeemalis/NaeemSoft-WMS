@@ -196,6 +196,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
         _issueNumber = number;
       });
       _message('تم حفظ مسودة الصرف • ' + number);
+      Navigator.of(context).pop();
     } catch (error) {
       if (mounted) _message('تعذر حفظ المسودة: ' + error.toString());
     } finally {
@@ -221,7 +222,10 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
         _quantity = '0';
       });
       await _load();
-      if (mounted) _message(tr('documentApproved'));
+      if (mounted) {
+        Navigator.of(context).pop();
+        _message(tr('documentApproved'));
+      }
     } catch (error) {
       if (mounted) _message('تعذر اعتماد الصرف: ' + error.toString());
     } finally {
@@ -277,6 +281,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
         _issueNumber = null;
         _recipientId = null;
       });
+      Navigator.of(context).pop();
       _message('تم إلغاء مسودة الصرف دون تغيير المخزون.');
     } catch (error) {
       if (mounted) _message('تعذر إلغاء المسودة: ' + error.toString());
