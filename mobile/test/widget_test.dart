@@ -217,7 +217,7 @@ void main() {
     final draftState = await tester.runAsync(() async => {
       'stock': (await db.query('inventory_batches')).single['remaining_quantity_base'],
       'status': (await db.query('issues')).single['status'],
-    });
+    }) ?? <String, Object?>{};
     expect(draftState['stock'], 20);
     expect(draftState['status'], 'draft');
 
@@ -226,7 +226,7 @@ void main() {
     final approvedState = await tester.runAsync(() async => {
       'stock': (await db.query('inventory_batches')).single['remaining_quantity_base'],
       'status': (await db.query('issues')).single['status'],
-    });
+    }) ?? <String, Object?>{};
     expect(approvedState['stock'], 18);
     expect(approvedState['status'], 'approved');
   });
