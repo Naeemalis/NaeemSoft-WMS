@@ -229,8 +229,6 @@ void main() {
     expect(draftState['stock'], 20);
     expect(draftState['status'], 'draft');
 
-    await tester.tap(find.text('السلة (1) • 10'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('approveDocument'));
     await _pumpDatabase(tester);
     final approvedState = await tester.runAsync(() async => {
