@@ -33,6 +33,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
   Map<String, Object?>? _selectedUnit;
   bool _loading = true;
   bool _busy = false;
+  VoidCallback? _refreshCartSheet;
 
   String tr(String key) => widget.tr(key);
 
@@ -195,8 +196,8 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
         _issueId = id;
         _issueNumber = number;
       });
+      _refreshCartSheet?.call();
       _message('تم حفظ مسودة الصرف • ' + number);
-      Navigator.of(context).pop();
     } catch (error) {
       if (mounted) _message('تعذر حفظ المسودة: ' + error.toString());
     } finally {
@@ -602,9 +603,14 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
               : () => showModalBottomSheet<void>(
                   context: context,
                   isScrollControlled: true,
-                  builder: (context) => SizedBox(
-                    height: MediaQuery.sizeOf(context).height * 0.78,
-                    child: _cartSheet(),
+                  builder: (context) => StatefulBuilder(
+                    builder: (context, setSheetState) {
+                      _refreshCartSheet = () => setSheetState(() {});
+                      return SizedBox(
+                        height: MediaQuery.sizeOf(context).height * 0.78,
+                        child: _cartSheet(),
+                      );
+                    },
                   ),
                 ),
           icon: const Icon(Icons.shopping_cart_outlined),
