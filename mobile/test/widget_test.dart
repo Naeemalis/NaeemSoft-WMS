@@ -197,12 +197,16 @@ void main() {
     await _pumpDatabase(tester);
 
     expect(find.text('صنف تجريبي'), findsOneWidget);
+    await tester.tap(find.text('2'));
+    await tester.pump();
     await tester.tap(find.text('صنف تجريبي'));
     await tester.pump();
     expect(find.text('كيلوغرام'), findsOneWidget);
-    await tester.tap(find.text('2'));
     await tester.tap(find.text('كيلوغرام'));
-    await tester.tap(find.text('إضافة إلى السلة'));
+    await tester.pump();
+    final addButton = find.widgetWithText(FilledButton, 'إضافة إلى السلة');
+    expect(tester.widget<FilledButton>(addButton).onPressed, isNotNull);
+    await tester.tap(addButton);
     await tester.pump();
 
     expect(find.text('السلة (1) • 10'), findsOneWidget);
