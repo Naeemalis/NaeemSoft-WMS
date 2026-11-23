@@ -92,11 +92,6 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
     });
   }
 
-  void _clearQuantity() {
-    if (_issueId != null || _busy) return;
-    setState(() => _quantity = '0');
-  }
-
   void _addHalf() {
     if (_issueId != null || _busy) return;
     final value = double.tryParse(_quantity) ?? 0;
