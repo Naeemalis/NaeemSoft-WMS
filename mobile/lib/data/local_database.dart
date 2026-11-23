@@ -52,7 +52,7 @@ class LocalDatabase {
     final helper = LocalDatabase._();
     return openDatabase(
       inMemoryDatabasePath,
-      version: 5,
+      version: 6,
       onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, version) async {
         await helper._createSchema(db, version);
@@ -60,6 +60,7 @@ class LocalDatabase {
         await helper._migrateV3(db);
         await helper._migrateV4(db);
         await helper._migrateV5(db);
+        await helper._migrateV6(db);
       },
     );
   }
