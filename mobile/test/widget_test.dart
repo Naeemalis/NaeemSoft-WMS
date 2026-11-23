@@ -121,6 +121,30 @@ void main() {
     expect(returnedToCashier, isTrue);
   });
 
+  testWidgets('existing product can receive its saved unit sale price', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: ProductManagementPage(tr: (key) => key),
+    ));
+    await _pumpDatabase(tester);
+
+    expect(find.text('صنف تجريبي'), findsOneWidget);
+    await tester.tap(find.text('صنف تجريبي'));
+    await _pumpDatabase(tester);
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byType(TextField), findsAtLeastNWidgets(4));
+    await tester.enterText(find.byType(TextField).at(3), '8');
+    await tester.tap(find.text('save'));
+    await _pumpDatabase(tester);
+
+    final rows = await tester.runAsync(() => db.query(
+      'product_units',
+      where: 'product_id = ? AND unit_id = ?',
+      whereArgs: [productId, unitId],
+    )) ?? [];
+    expect(rows, hasLength(1));
+    expect(rows.single['sale_price'], 8.0);
+  });
+
   testWidgets('supplier shortcut opens fields and persists supplier', (tester) async {
     var returnedToCashier = false;
     await tester.pumpWidget(MaterialApp(
