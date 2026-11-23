@@ -337,6 +337,11 @@ class LocalDatabase {
       ['kg', 'كيلوغرام', 'Kilogram', 'Kilogramme'],
       ['g', 'غرام', 'Gram', 'Gramme'],
       ['l', 'لتر', 'Litre', 'Litre'],
+      ['bag', 'كيس', 'Bag', 'Sac'],
+      ['ton', 'طن', 'Tonne', 'Tonne'],
+      ['ml', 'ملليلتر', 'Millilitre', 'Millilitre'],
+      ['gallon', 'جالون', 'Gallon', 'Gallon'],
+      ['barrel', 'برميل', 'Barrel', 'Baril'],
     ];
     for (final unit in units) {
       unitBatch.insert('units', {'code': unit[0], 'name_ar': unit[1], 'name_en': unit[2], 'name_fr': unit[3]});
@@ -605,6 +610,18 @@ class LocalDatabase {
         ADD COLUMN product_type TEXT NOT NULL DEFAULT 'count'
           CHECK(product_type IN ('count','weight','liquid'))
       ''');
+    }
+    const additionalUnits = [
+      ['bag', 'كيس', 'Bag', 'Sac'],
+      ['ton', 'طن', 'Tonne', 'Tonne'],
+      ['ml', 'ملليلتر', 'Millilitre', 'Millilitre'],
+      ['gallon', 'جالون', 'Gallon', 'Gallon'],
+      ['barrel', 'برميل', 'Barrel', 'Baril'],
+    ];
+    for (final unit in additionalUnits) {
+      await db.insert('units', {
+        'code': unit[0], 'name_ar': unit[1], 'name_en': unit[2], 'name_fr': unit[3],
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 
