@@ -290,6 +290,11 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
       baseUnitId,
       () => _ProductUnitDraft(isSelected: true, factor: '1'),
     );
+    final orderedUnits = [..._units]..sort((a, b) {
+      final aRank = a['id'] == baseUnitId ? 0 : 1;
+      final bRank = b['id'] == baseUnitId ? 0 : 1;
+      return aRank.compareTo(bRank);
+    });
 
     try {
       final result = await showDialog<bool>(
@@ -331,7 +336,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                   SizedBox(
                     height: 330,
                     child: ListView(
-                      children: _units.map((unit) {
+                      children: orderedUnits.map((unit) {
                         final id = unit['id'] as int;
                         final isBase = id == baseUnitId;
                         final draft = drafts.putIfAbsent(
