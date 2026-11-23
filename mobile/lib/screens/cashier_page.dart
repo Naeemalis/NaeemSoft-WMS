@@ -23,7 +23,7 @@ class _CashierPageState extends State<CashierPage> {
   int? _documentId;
   bool _busy = false;
   String? _documentNumber;
-  final TextEditingController _issueQuantity = TextEditingController(text: '1');
+  final TextEditingController _issueQuantity = TextEditingController(text: '0');
   Map<String, Object?>? _selectedIssueProduct;
   Map<String, Object?>? _selectedIssueUnit;
 
@@ -457,7 +457,7 @@ class _CashierPageState extends State<CashierPage> {
                             Expanded(
                               child: TextField(
                                 controller: line.price,
-                                enabled: _documentId == null,
+                                enabled: _documentId == null && widget.receiving,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 decoration: InputDecoration(labelText: _label(widget.receiving ? 'unitCost' : 'unitPrice')),
                                 onChanged: (_) => setState(() {}),
