@@ -169,23 +169,25 @@ void main() {
   });
 
   testWidgets('issue cashier selects product units dynamically and deducts stock only on approval', (tester) async {
-    await db.update('product_units', {'sale_price': 5},
-      where: 'product_id = ? AND unit_id = ?', whereArgs: [productId, unitId]);
-    final receiptId = await operations.createReceipt(
-      number: 'R-ISSUE-CASHIER-UI',
-      supplierId: supplierId,
-      receiptDate: DateTime(2026, 11, 23),
-      lines: [
-        ReceiptLineInput(
-          productId: productId,
-          unitId: unitId,
-          quantity: 20,
-          factorToBase: 1,
-          unitCost: 2,
-        ),
-      ],
-    );
-    await operations.approveReceipt(receiptId);
+    await tester.runAsync(() async {
+      await db.update('product_units', {'sale_price': 5},
+        where: 'product_id = ? AND unit_id = ?', whereArgs: [productId, unitId]);
+      final receiptId = await operations.createReceipt(
+        number: 'R-ISSUE-CASHIER-UI',
+        supplierId: supplierId,
+        receiptDate: DateTime(2026, 11, 23),
+        lines: [
+          ReceiptLineInput(
+            productId: productId,
+            unitId: unitId,
+            quantity: 20,
+            factorToBase: 1,
+            unitCost: 2,
+          ),
+        ],
+      );
+      await operations.approveReceipt(receiptId);
+    });
 
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -204,19 +206,29 @@ void main() {
     await tester.pump();
 
     expect(find.text('السلة (1) • 10'), findsOneWidget);
-    expect((await db.query('inventory_batches')).single['remaining_quantity_base'], 20);
+    final stockBeforeDraft = await tester.runAsync(() async =>
+      (await db.query('inventory_batches')).single['remaining_quantity_base']);
+    expect(stockBeforeDraft, 20);
 
     await tester.tap(find.text('السلة (1) • 10'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('saveDraft'));
     await _pumpDatabase(tester);
-    expect((await db.query('inventory_batches')).single['remaining_quantity_base'], 20);
-    expect((await db.query('issues')).single['status'], 'draft');
+    final draftState = await tester.runAsync(() async => {
+      'stock': (await db.query('inventory_batches')).single['remaining_quantity_base'],
+      'status': (await db.query('issues')).single['status'],
+    });
+    expect(draftState['stock'], 20);
+    expect(draftState['status'], 'draft');
 
     await tester.tap(find.text('approveDocument'));
     await _pumpDatabase(tester);
-    expect((await db.query('inventory_batches')).single['remaining_quantity_base'], 18);
-    expect((await db.query('issues')).single['status'], 'approved');
+    final approvedState = await tester.runAsync(() async => {
+      'stock': (await db.query('inventory_batches')).single['remaining_quantity_base'],
+      'status': (await db.query('issues')).single['status'],
+    });
+    expect(approvedState['stock'], 18);
+    expect(approvedState['status'], 'approved');
   });
 
   test('fresh database seeds the units required by product and cashier forms', () async {
