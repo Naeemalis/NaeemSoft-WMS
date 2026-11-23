@@ -127,8 +127,9 @@ void main() {
     ));
     await _pumpDatabase(tester);
 
+    expect(find.text('صنف تجريبي'), findsOneWidget);
     await tester.tap(find.text('صنف تجريبي'));
-    await tester.pumpAndSettle();
+    await _pumpDatabase(tester);
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.byType(TextField), findsAtLeastNWidgets(4));
     await tester.enterText(find.byType(TextField).at(3), '8');
