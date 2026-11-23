@@ -264,44 +264,241 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
 
   Future<void> _editProduct(Map<String, Object?> product) async {
     final name = TextEditingController(text: (product['name_ar'] ?? '').toString());
-    final minimum = TextEditingController(text: ((product['minimum_stock'] as num?) ?? 0).toString());
+    final minimum = TextEditingController(
+      text: ((product['minimum_stock'] as num?) ?? 0).toString(),
+    );
+    final baseUnitId = product['base_unit_id'] as int;
+    final db = await LocalDatabase.instance.database;
+    final existingRows = await db.query(
+      'product_units',
+      where: 'product_id = ?',
+      whereArgs: [product['id']],
+    );
+    final drafts = <int, _ProductUnitDraft>{};
+    for (final row in existingRows) {
+      final unitId = row['unit_id'] as int;
+      drafts[unitId] = _ProductUnitDraft(
+        isSelected: true,
+        isExisting: true,
+        factor: ((row['factor_to_base'] as num?) ?? 1).toString(),
+        salePrice: ((row['sale_price'] as num?) ?? 0).toString(),
+        canReceive: (row['can_receive'] as num?) == 1,
+        canIssue: (row['can_issue'] as num?) == 1,
+      );
+    }
+    drafts.putIfAbsent(
+      baseUnitId,
+      () => _ProductUnitDraft(isSelected: true, factor: '1'),
+    );
+
     try {
       final result = await showDialog<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('تعديل بيانات الصنف'),
-          content: SizedBox(
-            width: 420,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              TextField(controller: name, decoration: InputDecoration(labelText: widget.tr('productName'))),
-              const SizedBox(height: 10),
-              TextField(controller: minimum,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(labelText: widget.tr('minimumStock'))),
-            ]),
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('تعديل بيانات الصنف ووحداته'),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: 460,
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  TextField(
+                    controller: name,
+                    decoration: InputDecoration(labelText: widget.tr('productName')),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: minimum,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(labelText: widget.tr('minimumStock')),
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      'وحدة الأساس: ' + (_units.firstWhere(
+                        (unit) => unit['id'] == baseUnitId,
+                        orElse: () => {'name_ar': 'غير معروفة'},
+                      )['name_ar'] ?? '').toString(),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text('الوحدات ومعاملات التحويل وأسعار البيع',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  SizedBox(
+                    height: 330,
+                    child: ListView(
+                      children: _units.map((unit) {
+                        final id = unit['id'] as int;
+                        final isBase = id == baseUnitId;
+                        final draft = drafts.putIfAbsent(
+                          id,
+                          () => _ProductUnitDraft(isSelected: false, factor: '1'),
+                        );
+                        final enabled = draft.isSelected || draft.isExisting || isBase;
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(children: [
+                              CheckboxListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                value: enabled,
+                                title: Text((unit['name_ar'] ?? unit['code']).toString()),
+                                subtitle: isBase
+                                    ? const Text('وحدة الأساس — معامل التحويل = 1')
+                                    : draft.isExisting
+                                        ? const Text('وحدة مستخدمة سابقاً — لا تُحذف حفاظاً على الفواتير')
+                                        : null,
+                                onChanged: isBase || draft.isExisting
+                                    ? null
+                                    : (value) => setDialogState(
+                                        () => draft.isSelected = value ?? false,
+                                      ),
+                              ),
+                              if (enabled) ...[
+                                Row(children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: draft.factor,
+                                      enabled: !isBase,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      decoration: const InputDecoration(
+                                        labelText: 'معامل التحويل',
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: draft.salePrice,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      decoration: const InputDecoration(
+                                        labelText: 'سعر البيع',
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                ]),
+                                Wrap(spacing: 12, children: [
+                                  Row(mainAxisSize: MainAxisSize.min, children: [
+                                    Checkbox(
+                                      value: draft.canReceive,
+                                      onChanged: (v) => setDialogState(
+                                        () => draft.canReceive = v ?? false,
+                                      ),
+                                    ),
+                                    const Text('التوريد'),
+                                  ]),
+                                  Row(mainAxisSize: MainAxisSize.min, children: [
+                                    Checkbox(
+                                      value: draft.canIssue,
+                                      onChanged: (v) => setDialogState(
+                                        () => draft.canIssue = v ?? false,
+                                      ),
+                                    ),
+                                    const Text('الصرف'),
+                                  ]),
+                                ]),
+                              ],
+                            ]),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(widget.tr('cancel')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(widget.tr('save')),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(widget.tr('cancel'))),
-            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(widget.tr('save'))),
-          ],
         ),
       );
       if (result != true || !mounted) return;
+
       final min = double.tryParse(minimum.text.trim());
       if (name.text.trim().isEmpty || min == null || !min.isFinite || min < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل اسم الصنف وحد إعادة طلب صحيحاً.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('أدخل اسم الصنف وحد إعادة طلب صحيحاً.')),
+        );
         return;
       }
-      final db = await LocalDatabase.instance.database;
-      await db.update('products', {
-        'name_ar': name.text.trim(),
-        'name_en': name.text.trim(),
-        'name_fr': name.text.trim(),
-        'minimum_stock': min,
-      }, where: 'id = ?', whereArgs: [product['id']]);
+      final selected = drafts.entries.where((entry) =>
+        entry.value.isSelected || entry.value.isExisting || entry.key == baseUnitId
+      ).toList();
+      for (final entry in selected) {
+        final draft = entry.value;
+        final factor = entry.key == baseUnitId
+            ? 1.0
+            : double.tryParse(draft.factor.text.trim());
+        final price = double.tryParse(draft.salePrice.text.trim());
+        if (factor == null || !factor.isFinite || factor <= 0 ||
+            price == null || !price.isFinite || price < 0 ||
+            (draft.canIssue && price <= 0) ||
+            (!draft.canIssue && !draft.canReceive)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تحقق من معاملات التحويل والأسعار واستخدام كل وحدة.')),
+          );
+          return;
+        }
+      }
+
+      await db.transaction((txn) async {
+        await txn.update('products', {
+          'name_ar': name.text.trim(),
+          'name_en': name.text.trim(),
+          'name_fr': name.text.trim(),
+          'minimum_stock': min,
+        }, where: 'id = ?', whereArgs: [product['id']]);
+
+        for (final entry in selected) {
+          final draft = entry.value;
+          final values = {
+            'product_id': product['id'],
+            'unit_id': entry.key,
+            'factor_to_base': entry.key == baseUnitId
+                ? 1
+                : double.parse(draft.factor.text.trim()),
+            'sale_price': double.parse(draft.salePrice.text.trim()),
+            'can_receive': draft.canReceive ? 1 : 0,
+            'can_issue': draft.canIssue ? 1 : 0,
+          };
+          final rows = await txn.query(
+            'product_units',
+            columns: ['id'],
+            where: 'product_id = ? AND unit_id = ?',
+            whereArgs: [product['id'], entry.key],
+            limit: 1,
+          );
+          if (rows.isEmpty) {
+            await txn.insert('product_units', values);
+          } else {
+            await txn.update(
+              'product_units',
+              values,
+              where: 'product_id = ? AND unit_id = ?',
+              whereArgs: [product['id'], entry.key],
+            );
+          }
+        }
+      });
       await _load();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تحديث بيانات الصنف.')),
+        const SnackBar(content: Text('تم تحديث الصنف ووحداته وأسعار البيع.')),
       );
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -310,6 +507,9 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     } finally {
       name.dispose();
       minimum.dispose();
+      for (final draft in drafts.values) {
+        draft.dispose();
+      }
     }
   }
 
@@ -645,13 +845,20 @@ class _BasicReportsPageState extends State<BasicReportsPage> {
 
 
 class _ProductUnitDraft {
-  _ProductUnitDraft({required this.isSelected, String factor = '1'})
-      : factor = TextEditingController(text: factor),
-        salePrice = TextEditingController(text: '0');
+  _ProductUnitDraft({
+    required this.isSelected,
+    String factor = '1',
+    String salePrice = '0',
+    this.isExisting = false,
+    this.canReceive = true,
+    this.canIssue = true,
+  })  : factor = TextEditingController(text: factor),
+        salePrice = TextEditingController(text: salePrice);
 
   bool isSelected;
-  bool canReceive = true;
-  bool canIssue = true;
+  final bool isExisting;
+  bool canReceive;
+  bool canIssue;
   final TextEditingController factor;
   final TextEditingController salePrice;
 
