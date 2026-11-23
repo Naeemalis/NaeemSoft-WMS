@@ -21,7 +21,7 @@ class LocalDatabase {
     final path = p.join(root, 'naeemsoft_wms.db');
     _database = await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -33,12 +33,14 @@ class LocalDatabase {
         await _migrateV3(db);
         await _migrateV4(db);
         await _migrateV5(db);
+        await _migrateV6(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createExtendedSchema(db);
         if (oldVersion < 3) await _migrateV3(db);
         if (oldVersion < 4) await _migrateV4(db);
         if (oldVersion < 5) await _migrateV5(db);
+        if (oldVersion < 6) await _migrateV6(db);
       },
     );
     return _database!;
@@ -50,7 +52,7 @@ class LocalDatabase {
     final helper = LocalDatabase._();
     return openDatabase(
       inMemoryDatabasePath,
-      version: 5,
+      version: 6,
       onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, version) async {
         await helper._createSchema(db, version);
@@ -58,6 +60,7 @@ class LocalDatabase {
         await helper._migrateV3(db);
         await helper._migrateV4(db);
         await helper._migrateV5(db);
+        await helper._migrateV6(db);
       },
     );
   }
@@ -577,6 +580,17 @@ class LocalDatabase {
       CREATE INDEX IF NOT EXISTS idx_supplier_transactions_account_date
       ON supplier_transactions(supplier_id, transaction_date, id)
     ''');
+  }
+
+  /// Adds a saved sale price to each product-specific unit without changing existing data.
+  Future<void> _migrateV6(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(product_units)');
+    if (!columns.any((column) => column['name'] == 'sale_price')) {
+      await db.execute('''
+        ALTER TABLE product_units
+        ADD COLUMN sale_price REAL NOT NULL DEFAULT 0 CHECK(sale_price >= 0)
+      ''');
+    }
   }
 
   /// Repairs missing base-unit links for legacy products without deleting data.

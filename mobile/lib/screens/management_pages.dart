@@ -41,7 +41,12 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   Future<void> _addProduct() async {
     final name = TextEditingController();
     final minimum = TextEditingController(text: '0');
-    int? unitId = _units.isEmpty ? null : _units.first['id'] as int;
+    int? baseUnitId = _units.isEmpty ? null : _units.first['id'] as int;
+    final drafts = <int, _ProductUnitDraft>{};
+    if (baseUnitId != null) {
+      drafts[baseUnitId] = _ProductUnitDraft(isSelected: true, factor: '1');
+    }
+
     try {
       final result = await showDialog<bool>(
         context: context,
@@ -50,19 +55,32 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
             title: Text(widget.tr('addProduct')),
             content: SingleChildScrollView(
               child: SizedBox(
-                width: 420,
+                width: 460,
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  TextField(controller: name, autofocus: true,
-                    decoration: InputDecoration(labelText: widget.tr('productName'))),
+                  TextField(
+                    controller: name,
+                    autofocus: true,
+                    decoration: InputDecoration(labelText: widget.tr('productName')),
+                  ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<int>(
-                    initialValue: unitId,
+                    initialValue: baseUnitId,
+                    isExpanded: true,
                     decoration: InputDecoration(labelText: widget.tr('baseUnit')),
                     items: _units.map((unit) => DropdownMenuItem<int>(
                       value: unit['id'] as int,
                       child: Text((unit['name_ar'] ?? unit['code']).toString()),
                     )).toList(),
-                    onChanged: (value) => setDialogState(() => unitId = value),
+                    onChanged: (value) => setDialogState(() {
+                      baseUnitId = value;
+                      if (value != null) {
+                        final draft = drafts.putIfAbsent(
+                          value, () => _ProductUnitDraft(isSelected: true, factor: '1'),
+                        );
+                        draft.isSelected = true;
+                        draft.factor.text = '1';
+                      }
+                    }),
                   ),
                   const SizedBox(height: 10),
                   TextField(
@@ -70,45 +88,165 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(labelText: widget.tr('minimumStock')),
                   ),
+                  const SizedBox(height: 12),
+                  const Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text('وحدات الصنف وأسعار البيع ومعاملات التحويل',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 330,
+                    child: ListView(
+                      children: _units.map((unit) {
+                        final id = unit['id'] as int;
+                        final isBase = id == baseUnitId;
+                        final draft = drafts.putIfAbsent(
+                          id, () => _ProductUnitDraft(isSelected: false, factor: '1'),
+                        );
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              children: [
+                                CheckboxListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  value: draft.isSelected || isBase,
+                                  title: Text((unit['name_ar'] ?? unit['code']).toString()),
+                                  subtitle: isBase ? const Text('وحدة الأساس — معامل التحويل = 1') : null,
+                                  onChanged: isBase ? null : (value) => setDialogState(
+                                    () => draft.isSelected = value ?? false,
+                                  ),
+                                ),
+                                if (draft.isSelected || isBase) ...[
+                                  Row(children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: draft.factor,
+                                        enabled: !isBase,
+                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                        decoration: const InputDecoration(
+                                          labelText: 'كم وحدة أساس؟',
+                                          isDense: true,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: draft.salePrice,
+                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                        decoration: const InputDecoration(
+                                          labelText: 'سعر البيع',
+                                          isDense: true,
+                                        ),
+                                      ),
+                                    ),
+                                  ]),
+                                  Wrap(
+                                    spacing: 12,
+                                    children: [
+                                      Row(mainAxisSize: MainAxisSize.min, children: [
+                                        Checkbox(
+                                          value: draft.canReceive,
+                                          onChanged: (v) => setDialogState(() => draft.canReceive = v ?? false),
+                                        ),
+                                        const Text('يستخدم في التوريد'),
+                                      ]),
+                                      Row(mainAxisSize: MainAxisSize.min, children: [
+                                        Checkbox(
+                                          value: draft.canIssue,
+                                          onChanged: (v) => setDialogState(() => draft.canIssue = v ?? false),
+                                        ),
+                                        const Text('يستخدم في الصرف'),
+                                      ]),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
                 ]),
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(widget.tr('cancel'))),
-              FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(widget.tr('save'))),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(widget.tr('cancel')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(widget.tr('save')),
+              ),
             ],
           ),
         ),
       );
       if (result != true || !mounted) return;
+
       final parsedMinimum = double.tryParse(minimum.text.trim());
-      if (name.text.trim().isEmpty || unitId == null ||
+      if (name.text.trim().isEmpty || baseUnitId == null ||
           parsedMinimum == null || !parsedMinimum.isFinite || parsedMinimum < 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('أدخل اسم الصنف ووحدة الأساس وحد إعادة طلب صحيحاً.')),
         );
         return;
       }
+      final selected = drafts.entries.where((entry) =>
+        entry.value.isSelected || entry.key == baseUnitId).toList();
+      if (selected.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('اختر وحدة واحدة على الأقل للصنف.')),
+        );
+        return;
+      }
+      for (final entry in selected) {
+        final draft = entry.value;
+        final factor = entry.key == baseUnitId ? 1.0 : double.tryParse(draft.factor.text.trim());
+        final price = double.tryParse(draft.salePrice.text.trim());
+        if (factor == null || !factor.isFinite || factor <= 0 ||
+            price == null || !price.isFinite || price < 0 ||
+            (draft.canIssue && price <= 0) ||
+            (!draft.canIssue && !draft.canReceive)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تحقق من معامل التحويل وسعر البيع واختيار استخدام الوحدة.')),
+          );
+          return;
+        }
+      }
+
       final db = await LocalDatabase.instance.database;
       await db.transaction((txn) async {
         final productId = await txn.insert('products', {
           'name_ar': name.text.trim(),
           'name_en': name.text.trim(),
           'name_fr': name.text.trim(),
-          'base_unit_id': unitId,
+          'base_unit_id': baseUnitId,
           'minimum_stock': parsedMinimum,
         });
-        await txn.insert('product_units', {
-          'product_id': productId,
-          'unit_id': unitId,
-          'factor_to_base': 1,
-          'can_receive': 1,
-          'can_issue': 1,
-        });
+        for (final entry in selected) {
+          final draft = entry.value;
+          await txn.insert('product_units', {
+            'product_id': productId,
+            'unit_id': entry.key,
+            'factor_to_base': entry.key == baseUnitId ? 1 : double.parse(draft.factor.text.trim()),
+            'sale_price': double.parse(draft.salePrice.text.trim()),
+            'can_receive': draft.canReceive ? 1 : 0,
+            'can_issue': draft.canIssue ? 1 : 0,
+          });
+        }
       });
       await _load();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إضافة الصنف بنجاح.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تمت إضافة الصنف ووحداته وأسعار البيع بنجاح.')),
+        );
         widget.onDone?.call();
       }
     } catch (error) {
@@ -118,6 +256,9 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     } finally {
       name.dispose();
       minimum.dispose();
+      for (final draft in drafts.values) {
+        draft.dispose();
+      }
     }
   }
 
@@ -499,5 +640,23 @@ class _BasicReportsPageState extends State<BasicReportsPage> {
         ],
       ),
     );
+  }
+}
+
+
+class _ProductUnitDraft {
+  _ProductUnitDraft({required this.isSelected, String factor = '1'})
+      : factor = TextEditingController(text: factor),
+        salePrice = TextEditingController(text: '0');
+
+  bool isSelected;
+  bool canReceive = true;
+  bool canIssue = true;
+  final TextEditingController factor;
+  final TextEditingController salePrice;
+
+  void dispose() {
+    factor.dispose();
+    salePrice.dispose();
   }
 }
