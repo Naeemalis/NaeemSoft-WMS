@@ -210,6 +210,10 @@ void main() {
     await tester.pump();
 
     expect(find.text('السلة (1) • 10'), findsOneWidget);
+    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Test recipient').last);
+    await tester.pump();
     final stockBeforeDraft = await tester.runAsync(() async =>
       (await db.query('inventory_batches')).single['remaining_quantity_base']);
     expect(stockBeforeDraft, 20);
