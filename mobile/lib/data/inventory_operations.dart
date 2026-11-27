@@ -221,6 +221,19 @@ class InventoryOperations {
         'approved_by': approvedBy,
         'approved_at': DateTime.now().toIso8601String(),
       }, where: 'id = ?', whereArgs: [issueId]);
+
+      // Post the recipient's payable only after the issue is fully approved.
+      // The unique source index makes this ledger posting idempotent.
+      await txn.insert('recipient_transactions', {
+        'recipient_id': issue['recipient_id'],
+        'transaction_type': 'issue',
+        'document_type': 'issue',
+        'document_id': issueId,
+        'debit': issue['total_amount'],
+        'credit': 0,
+        'transaction_date': issue['issue_date'],
+        'notes': 'Approved issue ${issue['issue_number']}',
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     });
   }
 
