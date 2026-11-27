@@ -72,12 +72,12 @@ class _WmsShellState extends State<WmsShell> {
     ('products', Icons.inventory_2_outlined),
     ('receiving', Icons.move_to_inbox_outlined),
     ('issuing', Icons.outbox_outlined),
-    ('sales', Icons.point_of_sale_outlined),
     ('suppliers', Icons.local_shipping_outlined),
     ('recipients', Icons.people_alt_outlined),
     ('reports', Icons.assessment_outlined),
     ('settings', Icons.settings_outlined),
     ('supplierStatement', Icons.account_balance_wallet_outlined),
+    ('sales', Icons.point_of_sale_outlined),
   ];
 
   String tr(String key) => _strings[widget.locale.languageCode]?[key] ??
@@ -93,7 +93,7 @@ class _WmsShellState extends State<WmsShell> {
   }
 
   void _openProductForm() {
-    setState(() { _returnToCashierPage = _selected == 2 || _selected == 3 ? _selected : null; _selected = 1; _autoOpenProductForm = true; _autoOpenPartnerPage = null; });
+    setState(() { _returnToCashierPage = _selected == 2 || _selected == 3 || _selected == 9 ? _selected : null; _selected = 1; _autoOpenProductForm = true; _autoOpenPartnerPage = null; });
   }
 
   void _returnToCashier() {
@@ -204,8 +204,8 @@ class _WmsShellState extends State<WmsShell> {
         ],
       ),
       bottomNavigationBar: wide ? null : NavigationBar(
-        selectedIndex: _selected <= 4 ? _selected : 0,
-        onDestinationSelected: _selectPage,
+        selectedIndex: _selected == 9 ? 4 : (_selected <= 3 ? _selected : 0),
+        onDestinationSelected: (value) => _selectPage(value == 4 ? 9 : value),
         destinations: [
           NavigationDestination(icon: const Icon(Icons.dashboard_outlined), label: tr('dashboard')),
           NavigationDestination(icon: const Icon(Icons.inventory_2_outlined), label: tr('products')),
