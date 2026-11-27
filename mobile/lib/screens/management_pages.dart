@@ -873,41 +873,31 @@ class _BasicReportsPageState extends State<BasicReportsPage> {
 class IssueStatementPage extends StatefulWidget {
   const IssueStatementPage({required this.tr, super.key});
   final String Function(String) tr;
-
   @override
   State<IssueStatementPage> createState() => _IssueStatementPageState();
 }
-
 class _IssueStatementPageState extends State<IssueStatementPage> {
   List<Map<String, Object?>> _documents = [];
   final Map<int, List<Map<String, Object?>>> _items = {};
   bool _loading = true;
-
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
+  void initState() { super.initState(); _load(); }
   Future<void> _load() async {
     final db = await LocalDatabase.instance.database;
     final documents = await db.rawQuery('''
       SELECT i.id, i.issue_number, i.issue_date, i.total_amount,
              r.name AS recipient_name, r.phone AS recipient_phone
-      FROM issues i
-      JOIN recipients r ON r.id = i.recipient_id
+      FROM issues i JOIN recipients r ON r.id = i.recipient_id
       WHERE i.status = 'approved'
       ORDER BY i.issue_date DESC, i.id DESC
     ''');
     final itemRows = await db.rawQuery('''
       SELECT ii.issue_id, p.name_ar AS product_name, ii.quantity,
              u.name_ar AS unit_name, ii.unit_price, ii.line_total
-      FROM issue_items ii
-      JOIN products p ON p.id = ii.product_id
+      FROM issue_items ii JOIN products p ON p.id = ii.product_id
       JOIN units u ON u.id = ii.unit_id
       JOIN issues i ON i.id = ii.issue_id
-      WHERE i.status = 'approved'
-      ORDER BY ii.id
+      WHERE i.status = 'approved' ORDER BY ii.id
     ''');
     final grouped = <int, List<Map<String, Object?>>>{};
     for (final row in itemRows) {
@@ -917,41 +907,12 @@ class _IssueStatementPageState extends State<IssueStatementPage> {
     if (!mounted) return;
     setState(() {
       _documents = documents;
-      _items
-        ..clear()
-        ..addAll(grouped);
+      _items..clear()..addAll(grouped);
       _loading = false;
     });
   }
-
   String _amount(Object? value) =>
-      ((value as num?) ?? 0).toDouble().toStringAsFixed(2).replaceFirst(RegExp(r'\\.00
-  _ProductUnitDraft({
-    required this.isSelected,
-    String factor = '1',
-    String salePrice = '0',
-    this.isExisting = false,
-    this.canReceive = true,
-    this.canIssue = true,
-    this.canSell = true,
-  })  : factor = TextEditingController(text: factor),
-        salePrice = TextEditingController(text: salePrice);
-
-  bool isSelected;
-  final bool isExisting;
-  bool canReceive;
-  bool canIssue;
-  bool canSell;
-  final TextEditingController factor;
-  final TextEditingController salePrice;
-
-  void dispose() {
-    factor.dispose();
-    salePrice.dispose();
-  }
-}
-), '');
-
+      ((value as num?) ?? 0).toDouble().toStringAsFixed(2);
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
@@ -998,7 +959,6 @@ class _IssueStatementPageState extends State<IssueStatementPage> {
     );
   }
 }
-
 class _ProductUnitDraft {
   _ProductUnitDraft({
     required this.isSelected,
@@ -1010,7 +970,6 @@ class _ProductUnitDraft {
     this.canSell = true,
   })  : factor = TextEditingController(text: factor),
         salePrice = TextEditingController(text: salePrice);
-
   bool isSelected;
   final bool isExisting;
   bool canReceive;
@@ -1018,9 +977,5 @@ class _ProductUnitDraft {
   bool canSell;
   final TextEditingController factor;
   final TextEditingController salePrice;
-
-  void dispose() {
-    factor.dispose();
-    salePrice.dispose();
-  }
+  void dispose() { factor.dispose(); salePrice.dispose(); }
 }
