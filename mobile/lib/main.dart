@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'data/local_database.dart';
 import 'screens/cashier_page.dart';
 import 'screens/issue_cashier_page.dart';
+import 'screens/sales_cashier_page.dart';
 import 'screens/management_pages.dart';
 import 'screens/supplier_statement_page.dart';
 import 'data/demo_data_seeder.dart';
@@ -71,6 +72,7 @@ class _WmsShellState extends State<WmsShell> {
     ('products', Icons.inventory_2_outlined),
     ('receiving', Icons.move_to_inbox_outlined),
     ('issuing', Icons.outbox_outlined),
+    ('sales', Icons.point_of_sale_outlined),
     ('suppliers', Icons.local_shipping_outlined),
     ('recipients', Icons.people_alt_outlined),
     ('reports', Icons.assessment_outlined),
@@ -87,7 +89,7 @@ class _WmsShellState extends State<WmsShell> {
   }
 
   void _openPartnerForm(int index) {
-    setState(() { _returnToCashierPage = _selected == 2 || _selected == 3 ? _selected : null; _selected = index; _autoOpenPartnerPage = index; _autoOpenProductForm = false; });
+    setState(() { _returnToCashierPage = _selected == 2 || _selected == 3 || _selected == 9 ? _selected : null; _selected = index; _autoOpenPartnerPage = index; _autoOpenProductForm = false; });
   }
 
   void _openProductForm() {
@@ -142,6 +144,13 @@ class _WmsShellState extends State<WmsShell> {
                     onOpenRecipients: () => _openPartnerForm(5),
                     onOpenProducts: _openProductForm,
                   )
+                : _selected == 9
+                    ? SalesCashierPage(
+                        key: const ValueKey('sales-cashier'),
+                        tr: tr,
+                        onOpenRecipients: () => _openPartnerForm(5),
+                        onOpenProducts: _openProductForm,
+                      )
                 : _selected == 4
                     ? PartnerManagementPage(key: ValueKey('suppliers-$_autoOpenPartnerPage'), tr: tr, suppliers: true, autoOpenAdd: _autoOpenPartnerPage == 4, onDone: _returnToCashier)
                     : _selected == 5
@@ -195,13 +204,14 @@ class _WmsShellState extends State<WmsShell> {
         ],
       ),
       bottomNavigationBar: wide ? null : NavigationBar(
-        selectedIndex: _selected <= 3 ? _selected : 0,
+        selectedIndex: _selected <= 4 ? _selected : 0,
         onDestinationSelected: _selectPage,
         destinations: [
           NavigationDestination(icon: const Icon(Icons.dashboard_outlined), label: tr('dashboard')),
           NavigationDestination(icon: const Icon(Icons.inventory_2_outlined), label: tr('products')),
           NavigationDestination(icon: const Icon(Icons.move_to_inbox_outlined), label: tr('receiving')),
           NavigationDestination(icon: const Icon(Icons.outbox_outlined), label: tr('issuing')),
+          NavigationDestination(icon: const Icon(Icons.point_of_sale_outlined), label: tr('sales')),
         ],
       ),
     );
@@ -221,6 +231,7 @@ class DashboardPage extends StatelessWidget {
       ('products', Icons.inventory_2_outlined, 1),
       ('receiving', Icons.move_to_inbox_outlined, 2),
       ('issuing', Icons.outbox_outlined, 3),
+      ('sales', Icons.point_of_sale_outlined, 9),
       ('suppliers', Icons.local_shipping_outlined, 4),
       ('recipients', Icons.people_alt_outlined, 5),
       ('reports', Icons.assessment_outlined, 6),
@@ -360,7 +371,7 @@ class StatusChip extends StatelessWidget {
 
 const Map<String, Map<String, String>> _strings = {
   'ar': {
-    'dashboard':'لوحة التحكم','products':'الأصناف','receiving':'كاشير الاستلام','issuing':'كاشير الصرف',
+    'dashboard':'لوحة التحكم','products':'الأصناف','receiving':'قسم التوريد','issuing':'قسم الصرف','sales':'قسم المبيعات',
     'suppliers':'الموردون','recipients':'المستلمون','reports':'التقارير والكشوف','settings':'الإعدادات','more':'المزيد','supplierStatement':'كشف حساب المورد',
     'welcome':'مرحباً بك في NaeemSoft-WMS','offlineSingle':'إدارة مخزن واحد محلياً على هذا الجهاز دون الحاجة إلى الإنترنت.',
     'statusLegend':'دلالات ألوان الأصناف','noProducts':'لا توجد أصناف مسجلة بعد.','noAvailableProducts':'لا توجد أصناف متاحة للصرف.',
@@ -381,7 +392,7 @@ const Map<String, Map<String, String>> _strings = {
     'approvedReceipts':'الاستلامات المعتمدة','approvedIssues':'عمليات الصرف المعتمدة','stockMovements':'حركات المخزون',
   },
   'en': {
-    'dashboard':'Dashboard','products':'Products','receiving':'Receiving cashier','issuing':'Issue cashier',
+    'dashboard':'Dashboard','products':'Products','receiving':'Receiving','issuing':'Issues','sales':'Sales',
     'suppliers':'Suppliers','recipients':'Recipients','reports':'Reports & statements','settings':'Settings','more':'More','supplierStatement':'Supplier statement',
     'welcome':'Welcome to NaeemSoft-WMS','offlineSingle':'Manage one warehouse locally on this device without internet.',
     'statusLegend':'Product status colors','noProducts':'No products have been registered yet.','noAvailableProducts':'No products are available to issue.',
@@ -402,7 +413,7 @@ const Map<String, Map<String, String>> _strings = {
     'approvedReceipts':'Approved receipts','approvedIssues':'Approved issues','stockMovements':'Stock movements',
   },
   'fr': {
-    'dashboard':'Tableau de bord','products':'Articles','receiving':'Caisse de réception','issuing':'Caisse de sortie',
+    'dashboard':'Tableau de bord','products':'Articles','receiving':'Réception','issuing':'Sorties','sales':'Ventes',
     'suppliers':'Fournisseurs','recipients':'Destinataires','reports':'Rapports et relevés','settings':'Paramètres','more':'Plus','supplierStatement':'Relevé fournisseur',
     'welcome':'Bienvenue dans NaeemSoft-WMS','offlineSingle':'Gérez un seul dépôt localement sur cet appareil, sans Internet.',
     'statusLegend':'Couleurs d’état des articles','noProducts':'Aucun article enregistré.','noAvailableProducts':'Aucun article disponible pour la sortie.',
