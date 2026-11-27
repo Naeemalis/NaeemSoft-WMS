@@ -78,6 +78,7 @@ class _WmsShellState extends State<WmsShell> {
     ('settings', Icons.settings_outlined),
     ('supplierStatement', Icons.account_balance_wallet_outlined),
     ('sales', Icons.point_of_sale_outlined),
+    ('issueStatement', Icons.receipt_long_outlined),
   ];
 
   String tr(String key) => _strings[widget.locale.languageCode]?[key] ??
@@ -161,7 +162,9 @@ class _WmsShellState extends State<WmsShell> {
                                 ? SettingsPage(locale: widget.locale, onChanged: widget.onLocaleChanged, tr: tr)
                                 : _selected == 8
                                     ? SupplierStatementPage(tr: tr)
-                                    : DashboardPage(tr: tr, onOpen: (index) => setState(() => _selected = index));
+                                    : _selected == 10
+                                        ? IssueStatementPage(tr: tr)
+                                        : DashboardPage(tr: tr, onOpen: (index) => setState(() => _selected = index));
 
     return Scaffold(
       drawer: _navigationDrawer(),
@@ -232,6 +235,7 @@ class DashboardPage extends StatelessWidget {
       ('receiving', Icons.move_to_inbox_outlined, 2),
       ('issuing', Icons.outbox_outlined, 3),
       ('sales', Icons.point_of_sale_outlined, 9),
+      ('issueStatement', Icons.receipt_long_outlined, 10),
       ('suppliers', Icons.local_shipping_outlined, 4),
       ('recipients', Icons.people_alt_outlined, 5),
       ('reports', Icons.assessment_outlined, 6),
@@ -372,7 +376,7 @@ class StatusChip extends StatelessWidget {
 const Map<String, Map<String, String>> _strings = {
   'ar': {
     'dashboard':'لوحة التحكم','products':'الأصناف','receiving':'قسم التوريد','issuing':'قسم الصرف','sales':'قسم المبيعات',
-    'suppliers':'الموردون','recipients':'المستلمون','reports':'التقارير والكشوف','settings':'الإعدادات','more':'المزيد','supplierStatement':'كشف حساب المورد',
+    'suppliers':'الموردون','recipients':'المستلمون','reports':'التقارير والكشوف','settings':'الإعدادات','more':'المزيد','supplierStatement':'كشف حساب المورد','issueStatement':'كشف المنصرف','approvedSales':'المبيعات المعتمدة',
     'welcome':'مرحباً بك في NaeemSoft-WMS','offlineSingle':'إدارة مخزن واحد محلياً على هذا الجهاز دون الحاجة إلى الإنترنت.',
     'statusLegend':'دلالات ألوان الأصناف','noProducts':'لا توجد أصناف مسجلة بعد.','noAvailableProducts':'لا توجد أصناف متاحة للصرف.',
     'receivingRule':'اختر المورد ثم أضف الأصناف إلى فاتورة الاستلام. لا يضاف المخزون إلا بعد اعتماد الاستلام.',
@@ -393,7 +397,7 @@ const Map<String, Map<String, String>> _strings = {
   },
   'en': {
     'dashboard':'Dashboard','products':'Products','receiving':'Receiving','issuing':'Issues','sales':'Sales',
-    'suppliers':'Suppliers','recipients':'Recipients','reports':'Reports & statements','settings':'Settings','more':'More','supplierStatement':'Supplier statement',
+    'suppliers':'Suppliers','recipients':'Recipients','reports':'Reports & statements','settings':'Settings','more':'More','supplierStatement':'Supplier statement','issueStatement':'Issued items statement','approvedSales':'Approved sales',
     'welcome':'Welcome to NaeemSoft-WMS','offlineSingle':'Manage one warehouse locally on this device without internet.',
     'statusLegend':'Product status colors','noProducts':'No products have been registered yet.','noAvailableProducts':'No products are available to issue.',
     'receivingRule':'Select a supplier and add products to a receipt. Stock increases only after approval.',
@@ -414,7 +418,7 @@ const Map<String, Map<String, String>> _strings = {
   },
   'fr': {
     'dashboard':'Tableau de bord','products':'Articles','receiving':'Réception','issuing':'Sorties','sales':'Ventes',
-    'suppliers':'Fournisseurs','recipients':'Destinataires','reports':'Rapports et relevés','settings':'Paramètres','more':'Plus','supplierStatement':'Relevé fournisseur',
+    'suppliers':'Fournisseurs','recipients':'Destinataires','reports':'Rapports et relevés','settings':'Paramètres','more':'Plus','supplierStatement':'Relevé fournisseur','issueStatement':'État des sorties','approvedSales':'Ventes validées',
     'welcome':'Bienvenue dans NaeemSoft-WMS','offlineSingle':'Gérez un seul dépôt localement sur cet appareil, sans Internet.',
     'statusLegend':'Couleurs d’état des articles','noProducts':'Aucun article enregistré.','noAvailableProducts':'Aucun article disponible pour la sortie.',
     'receivingRule':'Choisissez un fournisseur et ajoutez les articles au reçu. Le stock augmente après validation.',
