@@ -7,6 +7,7 @@ import 'package:naeemsoft_wms/data/inventory_operations.dart';
 import 'package:naeemsoft_wms/data/local_database.dart';
 import 'package:naeemsoft_wms/data/supplier_account_operations.dart';
 import 'package:naeemsoft_wms/data/recipient_account_operations.dart';
+import 'package:naeemsoft_wms/data/sales_operations.dart';
 import 'package:naeemsoft_wms/data/demo_data_seeder.dart';
 import 'package:naeemsoft_wms/screens/management_pages.dart';
 import 'package:naeemsoft_wms/screens/cashier_page.dart';
@@ -461,6 +462,68 @@ void main() {
     expect(balance['closing'], 9);
   });
 
+
+  test('approved sale consumes shared stock, posts sale movement and customer debit once', () async {
+    final receiptId = await operations.createReceipt(
+      number: 'R-SALE-001',
+      supplierId: supplierId,
+      receiptDate: DateTime(2026, 11, 20),
+      lines: [
+        ReceiptLineInput(
+          productId: productId, unitId: unitId,
+          quantity: 12, factorToBase: 1, unitCost: 2,
+        ),
+      ],
+    );
+    await operations.approveReceipt(receiptId);
+    final sales = SalesOperations(db);
+    final saleId = await sales.createSale(
+      number: 'S-001',
+      recipientId: recipientId,
+      saleDate: DateTime(2026, 11, 21),
+      lines: [
+        SaleLineInput(
+          productId: productId, unitId: unitId,
+          quantity: 4, factorToBase: 1, unitPrice: 7,
+        ),
+      ],
+    );
+    expect((await db.query('inventory_batches')).single['remaining_quantity_base'], 12);
+    await sales.approveSale(saleId);
+    expect((await db.query('inventory_batches')).single['remaining_quantity_base'], 8);
+    expect((await db.query('sales')).single['status'], 'approved');
+    expect(Sqflite.firstIntValue(await db.rawQuery(
+      "SELECT COUNT(*) FROM stock_movements WHERE movement_type = 'sale' AND source_id = ?",
+      [saleId],
+    )), 1);
+    expect(Sqflite.firstIntValue(await db.rawQuery(
+      "SELECT COUNT(*) FROM recipient_transactions WHERE document_type = 'sale' AND document_id = ?",
+      [saleId],
+    )), 1);
+    final balance = await RecipientAccountOperations(db).getBalances(recipientId: recipientId);
+    expect(balance['debit'], 28);
+    expect(balance['closing'], 28);
+  });
+
+  test('sales reject product units explicitly disabled for selling', () async {
+    await db.update('product_units', {'can_sell': 0},
+      where: 'product_id = ? AND unit_id = ?', whereArgs: [productId, unitId]);
+    await expectLater(
+      SalesOperations(db).createSale(
+        number: 'S-DISABLED',
+        recipientId: recipientId,
+        saleDate: DateTime(2026, 11, 21),
+        lines: [
+          SaleLineInput(
+            productId: productId, unitId: unitId,
+            quantity: 1, factorToBase: 1, unitPrice: 5,
+          ),
+        ],
+      ),
+      throwsStateError,
+    );
+    expect(await db.query('sales'), isEmpty);
+  });
 
   test('supplier return reduces the original batch and supplier payable', () async {
     final receiptId = await operations.createReceipt(
