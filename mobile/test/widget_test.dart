@@ -6,6 +6,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:naeemsoft_wms/data/inventory_operations.dart';
 import 'package:naeemsoft_wms/data/local_database.dart';
 import 'package:naeemsoft_wms/data/supplier_account_operations.dart';
+import 'package:naeemsoft_wms/data/recipient_account_operations.dart';
 import 'package:naeemsoft_wms/data/demo_data_seeder.dart';
 import 'package:naeemsoft_wms/screens/management_pages.dart';
 import 'package:naeemsoft_wms/screens/cashier_page.dart';
@@ -410,6 +411,54 @@ void main() {
       "SELECT COUNT(*) FROM supplier_transactions WHERE document_type = 'receipt' AND document_id = ?",
       [receiptId],
     )), 1);
+  });
+
+
+  test('approved issue posts recipient debit once and recipient payment reduces balance', () async {
+    final receiptId = await operations.createReceipt(
+      number: 'R-RECIPIENT-LEDGER',
+      supplierId: supplierId,
+      receiptDate: DateTime(2026, 11, 20),
+      lines: [
+        ReceiptLineInput(
+          productId: productId, unitId: unitId,
+          quantity: 10, factorToBase: 1, unitCost: 2,
+        ),
+      ],
+    );
+    await operations.approveReceipt(receiptId);
+    final issueId = await operations.createIssue(
+      number: 'I-RECIPIENT-LEDGER',
+      recipientId: recipientId,
+      issueDate: DateTime(2026, 11, 21),
+      lines: [
+        IssueLineInput(
+          productId: productId, unitId: unitId,
+          quantity: 3, factorToBase: 1, unitPrice: 5,
+        ),
+      ],
+    );
+    await operations.approveIssue(issueId);
+    final accounts = RecipientAccountOperations(db);
+    var balance = await accounts.getBalances(recipientId: recipientId);
+    expect(balance['debit'], 15);
+    expect(balance['credit'], 0);
+    expect(balance['closing'], 15);
+    expect(Sqflite.firstIntValue(await db.rawQuery(
+      "SELECT COUNT(*) FROM recipient_transactions WHERE document_type = 'issue' AND document_id = ?",
+      [issueId],
+    )), 1);
+
+    await accounts.recordPayment(
+      number: 'RP-001',
+      recipientId: recipientId,
+      date: DateTime(2026, 11, 22),
+      amount: 6,
+    );
+    balance = await accounts.getBalances(recipientId: recipientId);
+    expect(balance['debit'], 15);
+    expect(balance['credit'], 6);
+    expect(balance['closing'], 9);
   });
 
 
