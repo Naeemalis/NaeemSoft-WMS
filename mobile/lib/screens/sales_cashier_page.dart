@@ -19,7 +19,7 @@ class SalesCashierPage extends StatefulWidget {
   State<SalesCashierPage> createState() => _SalesCashierPageState();
 }
 
-class _IssueCashierPageState extends State<IssueCashierPage> {
+class _SalesCashierPageState extends State<SalesCashierPage> {
   List<Map<String, Object?>> _products = [];
   List<Map<String, Object?>> _recipients = [];
   final Map<int, List<Map<String, Object?>>> _unitsByProduct = {};
@@ -78,14 +78,14 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
   }
 
   void _enterDigit(String digit) {
-    if (_issueId != null || _busy) return;
+    if (_saleId != null || _busy) return;
     setState(() {
       _quantity = _quantity == '0' ? digit : _quantity + digit;
     });
   }
 
   void _backspace() {
-    if (_issueId != null || _busy) return;
+    if (_saleId != null || _busy) return;
     setState(() {
       _quantity = _quantity.length <= 1
           ? '0'
@@ -94,7 +94,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
   }
 
   void _addHalf() {
-    if (_issueId != null || _busy) return;
+    if (_saleId != null || _busy) return;
     final value = double.tryParse(_quantity) ?? 0;
     setState(() => _quantity = _format(value + 0.5));
   }
@@ -103,7 +103,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
       value.toStringAsFixed(3).replaceFirst(RegExp(r'\.?0+$'), '');
 
   void _selectProduct(Map<String, Object?> product) {
-    if (_issueId != null || _busy) return;
+    if (_saleId != null || _busy) return;
     final units = _unitsByProduct[product['id'] as int] ?? [];
     if (units.isEmpty) {
       _message('لا توجد وحدات بيع معرفة لهذا الصنف.');
@@ -116,7 +116,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
   }
 
   void _selectUnit(Map<String, Object?> unit) {
-    if (_issueId != null || _busy) return;
+    if (_saleId != null || _busy) return;
     final price = (unit['sale_price'] as num?)?.toDouble() ?? 0;
     if (price <= 0) {
       _message('سعر بيع هذه الوحدة غير معرّف. حدّث تعريف الصنف أولاً.');
@@ -147,7 +147,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
       return;
     }
     setState(() {
-      _cart.add(_IssueCartLine(
+      _cart.add(_SaleCartLine(
         product: product,
         unitId: unit['unit_id'] as int,
         unitName: (unit['name_ar'] ?? unit['code']).toString(),
@@ -164,7 +164,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
       _cart.fold<double>(0, (sum, line) => sum + line.quantity * line.unitPrice);
 
   Future<void> _saveDraft() async {
-    if (_busy || _issueId != null) return;
+    if (_busy || _saleId != null) return;
     if (_recipientId == null) {
       _message('اختر العميل أولاً.');
       return;
@@ -193,8 +193,8 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
       );
       if (!mounted) return;
       setState(() {
-        _issueId = id;
-        _issueNumber = number;
+        _saleId = id;
+        _saleNumber = number;
       });
       _refreshCartSheet?.call();
       _message('تم حفظ مسودة المبيعات • ' + number);
@@ -206,17 +206,17 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
   }
 
   Future<void> _approve() async {
-    final id = _issueId;
+    final id = _saleId;
     if (id == null || _busy) return;
     setState(() => _busy = true);
     try {
       final db = await LocalDatabase.instance.database;
-      await InventoryOperations(db).approveSale(id);
+      await SalesOperations(db).approveSale(id);
       if (!mounted) return;
       setState(() {
         _cart.clear();
-        _issueId = null;
-        _issueNumber = null;
+        _saleId = null;
+        _saleNumber = null;
         _recipientId = null;
         _selectedProduct = null;
         _selectedUnit = null;
@@ -235,7 +235,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
   }
 
   Future<void> _cancelDraft() async {
-    final id = _issueId;
+    final id = _saleId;
     if (id == null || _busy) return;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -278,8 +278,8 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
       if (!mounted) return;
       setState(() {
         _cart.clear();
-        _issueId = null;
-        _issueNumber = null;
+        _saleId = null;
+        _saleNumber = null;
         _recipientId = null;
       });
       Navigator.of(context).pop();
@@ -306,7 +306,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
       initialValue: _recipientId,
       isExpanded: true,
       decoration: const InputDecoration(
-        labelText: 'جهة الاستلام',
+        labelText: 'العميل',
         border: OutlineInputBorder(),
         isDense: true,
       ),
@@ -315,7 +315,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
         child: Text((recipient['name'] ?? '').toString(),
           overflow: TextOverflow.ellipsis),
       )).toList(),
-      onChanged: _issueId == null
+      onChanged: _saleId == null
           ? (value) => setState(() => _recipientId = value)
           : null,
     );
@@ -362,7 +362,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
               : null,
           child: InkWell(
             borderRadius: BorderRadius.circular(10),
-            onTap: _issueId == null ? () => _selectProduct(product) : null,
+            onTap: _saleId == null ? () => _selectProduct(product) : null,
             child: Padding(
               padding: const EdgeInsets.all(5),
               child: Column(
@@ -390,7 +390,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
   }
 
   Widget _numberButton(String label, VoidCallback action) => FilledButton.tonal(
-    onPressed: _issueId == null && !_busy ? action : null,
+    onPressed: _saleId == null && !_busy ? action : null,
     style: FilledButton.styleFrom(
       padding: EdgeInsets.zero,
       minimumSize: const Size(30, 30),
@@ -503,7 +503,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: _issueId == null && !_busy &&
+              onPressed: _saleId == null && !_busy &&
                   _selectedProduct != null && _selectedUnit != null
                   ? _addToCart
                   : null,
@@ -525,8 +525,8 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
           children: [
             Text(tr('invoiceCart'),
               style: Theme.of(context).textTheme.titleLarge),
-            if (_issueNumber != null)
-              Text(tr('documentNumber') + ': ' + _issueNumber!),
+            if (_saleNumber != null)
+              Text(tr('documentNumber') + ': ' + _saleNumber!),
             const SizedBox(height: 8),
             Expanded(
               child: _cart.isEmpty
@@ -545,7 +545,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(_format(line.quantity * line.unitPrice)),
-                              if (_issueId == null)
+                              if (_saleId == null)
                                 IconButton(
                                   onPressed: () => setState(() => _cart.removeAt(index)),
                                   icon: const Icon(Icons.close),
@@ -567,7 +567,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
               ],
             ),
             const SizedBox(height: 10),
-            if (_issueId == null)
+            if (_saleId == null)
               FilledButton.icon(
                 onPressed: _busy || _recipientId == null || _cart.isEmpty
                     ? null
@@ -581,7 +581,7 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
                 icon: const Icon(Icons.verified_outlined),
                 label: Text(tr('approveDocument')),
               ),
-            if (_issueId != null)
+            if (_saleId != null)
               TextButton(
                 onPressed: _busy ? null : _cancelDraft,
                 child: Text(tr('cancelDraft')),
@@ -644,8 +644,8 @@ class _IssueCashierPageState extends State<IssueCashierPage> {
   }
 }
 
-class _IssueCartLine {
-  const _IssueCartLine({
+class _SaleCartLine {
+  const _SaleCartLine({
     required this.product,
     required this.unitId,
     required this.unitName,
