@@ -21,7 +21,7 @@ class LocalDatabase {
     final path = p.join(root, 'naeemsoft_wms.db');
     _database = await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -35,6 +35,7 @@ class LocalDatabase {
         await _migrateV5(db);
         await _migrateV6(db);
         await _migrateV7(db);
+        await _migrateV8(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createExtendedSchema(db);
@@ -43,6 +44,7 @@ class LocalDatabase {
         if (oldVersion < 5) await _migrateV5(db);
         if (oldVersion < 6) await _migrateV6(db);
         if (oldVersion < 7) await _migrateV7(db);
+        if (oldVersion < 8) await _migrateV8(db);
       },
     );
     return _database!;
@@ -54,7 +56,7 @@ class LocalDatabase {
     final helper = LocalDatabase._();
     return openDatabase(
       inMemoryDatabasePath,
-      version: 6,
+      version: 8,
       onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, version) async {
         await helper._createSchema(db, version);
@@ -64,6 +66,7 @@ class LocalDatabase {
         await helper._migrateV5(db);
         await helper._migrateV6(db);
         await helper._migrateV7(db);
+        await helper._migrateV8(db);
       },
     );
   }
@@ -111,6 +114,7 @@ class LocalDatabase {
         factor_to_base REAL NOT NULL CHECK(factor_to_base > 0),
         can_receive INTEGER NOT NULL DEFAULT 1 CHECK(can_receive IN (0,1)),
         can_issue INTEGER NOT NULL DEFAULT 1 CHECK(can_issue IN (0,1)),
+        can_sell INTEGER NOT NULL DEFAULT 1 CHECK(can_sell IN (0,1)),
         UNIQUE(product_id, unit_id)
       )''',
       '''CREATE TABLE suppliers (
@@ -259,7 +263,7 @@ class LocalDatabase {
         product_id INTEGER NOT NULL REFERENCES products(id),
         batch_id INTEGER REFERENCES inventory_batches(id),
         movement_type TEXT NOT NULL CHECK(movement_type IN
-          ('receipt','issue','customer_return','supplier_return','count_adjustment','reversal')),
+          ('receipt','issue','sale','customer_return','supplier_return','count_adjustment','reversal')),
         direction TEXT NOT NULL CHECK(direction IN ('IN','OUT')),
         quantity_base REAL NOT NULL CHECK(quantity_base > 0),
         source_type TEXT NOT NULL,
@@ -592,6 +596,102 @@ class LocalDatabase {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_recipient_transaction_source
       ON recipient_transactions(document_type, document_id, transaction_type)
     ''');
+  }
+
+  /// Adds independent sales documents and enables the sales movement type.
+  /// Existing product units remain sellable by default to preserve current product availability.
+  Future<void> _migrateV8(Database db) async {
+    final unitColumns = await db.rawQuery('PRAGMA table_info(product_units)');
+    if (!unitColumns.any((column) => column['name'] == 'can_sell')) {
+      await db.execute('''
+        ALTER TABLE product_units
+        ADD COLUMN can_sell INTEGER NOT NULL DEFAULT 1 CHECK(can_sell IN (0,1))
+      ''');
+    }
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sale_number TEXT NOT NULL UNIQUE,
+        recipient_id INTEGER NOT NULL REFERENCES recipients(id),
+        sale_date TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft'
+          CHECK(status IN ('draft','pending_approval','approved','cancelled')),
+        total_amount REAL NOT NULL DEFAULT 0 CHECK(total_amount >= 0),
+        notes TEXT,
+        created_by INTEGER REFERENCES users(id),
+        approved_by INTEGER REFERENCES users(id),
+        approved_at TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sale_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+        product_id INTEGER NOT NULL REFERENCES products(id),
+        unit_id INTEGER NOT NULL REFERENCES units(id),
+        quantity REAL NOT NULL CHECK(quantity > 0),
+        factor_to_base REAL NOT NULL CHECK(factor_to_base > 0),
+        unit_price REAL NOT NULL CHECK(unit_price >= 0),
+        line_total REAL NOT NULL CHECK(line_total >= 0),
+        sold_quantity_base REAL NOT NULL CHECK(sold_quantity_base > 0)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sale_allocations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sale_item_id INTEGER NOT NULL REFERENCES sale_items(id),
+        batch_id INTEGER NOT NULL REFERENCES inventory_batches(id),
+        quantity_base REAL NOT NULL CHECK(quantity_base > 0),
+        cost_at_sale REAL NOT NULL CHECK(cost_at_sale >= 0)
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_recipient_date ON sales(recipient_id, sale_date)');
+    await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_sale_ledger_source ON recipient_transactions(document_type, document_id, transaction_type)');
+
+    // SQLite cannot alter a CHECK constraint; rebuild only the movement table.
+    final movementColumns = await db.rawQuery("SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_movements'");
+    final movementSql = movementColumns.isEmpty ? '' : (movementColumns.first['sql'] ?? '').toString();
+    if (movementSql.isNotEmpty && !movementSql.contains("'sale'")) {
+      await db.execute('DROP INDEX IF EXISTS idx_movements_product_date');
+      await db.execute('DROP TRIGGER IF EXISTS trg_block_non_count_movement_during_freeze');
+      await db.execute('ALTER TABLE stock_movements RENAME TO stock_movements_v7');
+      await db.execute('''
+        CREATE TABLE stock_movements (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL REFERENCES products(id),
+          batch_id INTEGER REFERENCES inventory_batches(id),
+          movement_type TEXT NOT NULL CHECK(movement_type IN
+            ('receipt','issue','sale','customer_return','supplier_return','count_adjustment','reversal')),
+          direction TEXT NOT NULL CHECK(direction IN ('IN','OUT')),
+          quantity_base REAL NOT NULL CHECK(quantity_base > 0),
+          source_type TEXT NOT NULL,
+          source_id INTEGER NOT NULL,
+          occurred_at TEXT NOT NULL,
+          created_by INTEGER REFERENCES users(id),
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      ''');
+      await db.execute('''
+        INSERT INTO stock_movements
+        (id, product_id, batch_id, movement_type, direction, quantity_base,
+         source_type, source_id, occurred_at, created_by, created_at)
+        SELECT id, product_id, batch_id, movement_type, direction, quantity_base,
+               source_type, source_id, occurred_at, created_by, created_at
+        FROM stock_movements_v7
+      ''');
+      await db.execute('DROP TABLE stock_movements_v7');
+      await db.execute('CREATE INDEX idx_movements_product_date ON stock_movements(product_id, occurred_at)');
+      await db.execute('''
+        CREATE TRIGGER IF NOT EXISTS trg_block_non_count_movement_during_freeze
+        BEFORE INSERT ON stock_movements
+        WHEN EXISTS (SELECT 1 FROM stock_freezes WHERE ended_at IS NULL)
+          AND NEW.movement_type <> 'count_adjustment'
+        BEGIN
+          SELECT RAISE(ABORT, 'Stock movements are blocked during stocktaking');
+        END
+      ''');
+    }
   }
 
   Future<void> _migrateV6(Database db) async {
