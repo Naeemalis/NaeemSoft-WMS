@@ -829,6 +829,7 @@ class _BasicReportsPageState extends State<BasicReportsPage> {
       'recipients': Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM recipients WHERE is_active = 1')) ?? 0,
       'receipts': Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM receipts WHERE status = 'approved'")) ?? 0,
       'issues': Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM issues WHERE status = 'approved'")) ?? 0,
+      'sales': Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM sales WHERE status = 'approved'")) ?? 0,
       'movements': Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM stock_movements')) ?? 0,
     };
     if (!mounted) return;
@@ -844,6 +845,7 @@ class _BasicReportsPageState extends State<BasicReportsPage> {
       'recipients': 'recipients',
       'receipts': 'approvedReceipts',
       'issues': 'approvedIssues',
+      'sales': 'approvedSales',
       'movements': 'stockMovements',
     };
     return RefreshIndicator(
@@ -866,6 +868,136 @@ class _BasicReportsPageState extends State<BasicReportsPage> {
   }
 }
 
+
+
+class IssueStatementPage extends StatefulWidget {
+  const IssueStatementPage({required this.tr, super.key});
+  final String Function(String) tr;
+
+  @override
+  State<IssueStatementPage> createState() => _IssueStatementPageState();
+}
+
+class _IssueStatementPageState extends State<IssueStatementPage> {
+  List<Map<String, Object?>> _documents = [];
+  final Map<int, List<Map<String, Object?>>> _items = {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final db = await LocalDatabase.instance.database;
+    final documents = await db.rawQuery('''
+      SELECT i.id, i.issue_number, i.issue_date, i.total_amount,
+             r.name AS recipient_name, r.phone AS recipient_phone
+      FROM issues i
+      JOIN recipients r ON r.id = i.recipient_id
+      WHERE i.status = 'approved'
+      ORDER BY i.issue_date DESC, i.id DESC
+    ''');
+    final itemRows = await db.rawQuery('''
+      SELECT ii.issue_id, p.name_ar AS product_name, ii.quantity,
+             u.name_ar AS unit_name, ii.unit_price, ii.line_total
+      FROM issue_items ii
+      JOIN products p ON p.id = ii.product_id
+      JOIN units u ON u.id = ii.unit_id
+      JOIN issues i ON i.id = ii.issue_id
+      WHERE i.status = 'approved'
+      ORDER BY ii.id
+    ''');
+    final grouped = <int, List<Map<String, Object?>>>{};
+    for (final row in itemRows) {
+      final id = row['issue_id'] as int;
+      grouped.putIfAbsent(id, () => []).add(row);
+    }
+    if (!mounted) return;
+    setState(() {
+      _documents = documents;
+      _items
+        ..clear()
+        ..addAll(grouped);
+      _loading = false;
+    });
+  }
+
+  String _amount(Object? value) =>
+      ((value as num?) ?? 0).toDouble().toStringAsFixed(2).replaceFirst(RegExp(r'\\.00
+  _ProductUnitDraft({
+    required this.isSelected,
+    String factor = '1',
+    String salePrice = '0',
+    this.isExisting = false,
+    this.canReceive = true,
+    this.canIssue = true,
+    this.canSell = true,
+  })  : factor = TextEditingController(text: factor),
+        salePrice = TextEditingController(text: salePrice);
+
+  bool isSelected;
+  final bool isExisting;
+  bool canReceive;
+  bool canIssue;
+  bool canSell;
+  final TextEditingController factor;
+  final TextEditingController salePrice;
+
+  void dispose() {
+    factor.dispose();
+    salePrice.dispose();
+  }
+}
+), '');
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    final total = _documents.fold<double>(0,
+      (sum, row) => sum + ((row['total_amount'] as num?)?.toDouble() ?? 0));
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          Text('كشف المنصرف', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 5),
+          Text('الفواتير المعتمدة: ${_documents.length} • إجمالي المنصرف: ${_amount(total)}'),
+          const SizedBox(height: 10),
+          if (_documents.isEmpty)
+            const Center(child: Padding(
+              padding: EdgeInsets.all(28),
+              child: Text('لا توجد فواتير صرف معتمدة حتى الآن.'),
+            )),
+          ..._documents.map((document) {
+            final id = document['id'] as int;
+            final lines = _items[id] ?? [];
+            return Card(
+              child: ExpansionTile(
+                title: Text((document['issue_number'] ?? '').toString(),
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('${document['issue_date']} • ${document['recipient_name']}'),
+                trailing: Text(_amount(document['total_amount'])),
+                children: [
+                  if ((document['recipient_phone'] ?? '').toString().isNotEmpty)
+                    ListTile(dense: true, title: Text('الهاتف: ${document['recipient_phone']}')),
+                  ...lines.map((line) => ListTile(
+                    dense: true,
+                    title: Text((line['product_name'] ?? '').toString()),
+                    subtitle: Text('${_amount(line['quantity'])} ${line['unit_name']} × ${_amount(line['unit_price'])}'),
+                    trailing: Text(_amount(line['line_total'])),
+                  )),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
 
 class _ProductUnitDraft {
   _ProductUnitDraft({
