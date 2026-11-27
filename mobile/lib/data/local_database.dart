@@ -21,7 +21,7 @@ class LocalDatabase {
     final path = p.join(root, 'naeemsoft_wms.db');
     _database = await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -34,6 +34,7 @@ class LocalDatabase {
         await _migrateV4(db);
         await _migrateV5(db);
         await _migrateV6(db);
+        await _migrateV7(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createExtendedSchema(db);
@@ -41,6 +42,7 @@ class LocalDatabase {
         if (oldVersion < 4) await _migrateV4(db);
         if (oldVersion < 5) await _migrateV5(db);
         if (oldVersion < 6) await _migrateV6(db);
+        if (oldVersion < 7) await _migrateV7(db);
       },
     );
     return _database!;
@@ -61,6 +63,7 @@ class LocalDatabase {
         await helper._migrateV4(db);
         await helper._migrateV5(db);
         await helper._migrateV6(db);
+        await helper._migrateV7(db);
       },
     );
   }
@@ -583,6 +586,14 @@ class LocalDatabase {
   }
 
   /// Adds a saved sale price to each product-specific unit without changing existing data.
+  /// Ensures each approved issue is posted to the recipient ledger once.
+  Future<void> _migrateV7(Database db) async {
+    await db.execute('''
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_recipient_transaction_source
+      ON recipient_transactions(document_type, document_id, transaction_type)
+    ''');
+  }
+
   Future<void> _migrateV6(Database db) async {
     final columns = await db.rawQuery('PRAGMA table_info(product_units)');
     if (!columns.any((column) => column['name'] == 'sale_price')) {
