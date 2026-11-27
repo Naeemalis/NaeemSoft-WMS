@@ -162,6 +162,13 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                         ),
                                         const Text('يستخدم في الصرف'),
                                       ]),
+                                      Row(mainAxisSize: MainAxisSize.min, children: [
+                                        Checkbox(
+                                          value: draft.canSell,
+                                          onChanged: (v) => setDialogState(() => draft.canSell = v ?? false),
+                                        ),
+                                        const Text('يستخدم في البيع'),
+                                      ]),
                                     ],
                                   ),
                                 ],
@@ -212,8 +219,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         final price = double.tryParse(draft.salePrice.text.trim());
         if (factor == null || !factor.isFinite || factor <= 0 ||
             price == null || !price.isFinite || price < 0 ||
-            (draft.canIssue && price <= 0) ||
-            (!draft.canIssue && !draft.canReceive)) {
+            ((draft.canIssue || draft.canSell) && price <= 0) ||
+            (!draft.canIssue && !draft.canSell && !draft.canReceive)) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('تحقق من معامل التحويل وسعر البيع واختيار استخدام الوحدة.')),
           );
@@ -239,6 +246,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
             'sale_price': double.parse(draft.salePrice.text.trim()),
             'can_receive': draft.canReceive ? 1 : 0,
             'can_issue': draft.canIssue ? 1 : 0,
+            'can_sell': draft.canSell ? 1 : 0,
           });
         }
       });
@@ -284,6 +292,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         salePrice: ((row['sale_price'] as num?) ?? 0).toString(),
         canReceive: (row['can_receive'] as num?) == 1,
         canIssue: (row['can_issue'] as num?) == 1,
+        canSell: (row['can_sell'] as num?) == 1,
       );
     }
     drafts.putIfAbsent(
@@ -409,6 +418,15 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                     ),
                                     const Text('الصرف'),
                                   ]),
+                                  Row(mainAxisSize: MainAxisSize.min, children: [
+                                    Checkbox(
+                                      value: draft.canSell,
+                                      onChanged: (v) => setDialogState(
+                                        () => draft.canSell = v ?? false,
+                                      ),
+                                    ),
+                                    const Text('البيع'),
+                                  ]),
                                 ]),
                               ],
                             ]),
@@ -453,8 +471,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         final price = double.tryParse(draft.salePrice.text.trim());
         if (factor == null || !factor.isFinite || factor <= 0 ||
             price == null || !price.isFinite || price < 0 ||
-            (draft.canIssue && price <= 0) ||
-            (!draft.canIssue && !draft.canReceive)) {
+            ((draft.canIssue || draft.canSell) && price <= 0) ||
+            (!draft.canIssue && !draft.canSell && !draft.canReceive)) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('تحقق من معاملات التحويل والأسعار واستخدام كل وحدة.')),
           );
@@ -857,6 +875,7 @@ class _ProductUnitDraft {
     this.isExisting = false,
     this.canReceive = true,
     this.canIssue = true,
+    this.canSell = true,
   })  : factor = TextEditingController(text: factor),
         salePrice = TextEditingController(text: salePrice);
 
@@ -864,6 +883,7 @@ class _ProductUnitDraft {
   final bool isExisting;
   bool canReceive;
   bool canIssue;
+  bool canSell;
   final TextEditingController factor;
   final TextEditingController salePrice;
 
